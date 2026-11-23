@@ -1,0 +1,2895 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>نظام إدارة وبحث عُهد المخزن | مشروع مستقبل مصر 0056</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Font: Cairo & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Inter:wght@500;600;700&display=swap" rel="stylesheet" />
+  <!-- SheetJS for Excel Parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- html-to-image & jsPDF for 100% Native Crisp Arabic PDF Generation -->
+  <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Cairo', 'Inter', 'sans-serif'],
+            mono: ['Inter', 'monospace'],
+          },
+          colors: {
+            charcoal: {
+              950: '#0b0f14',
+              900: '#11161d',
+              850: '#161d26',
+              800: '#1c2530',
+              700: '#283444',
+            },
+            emerald: {
+              450: '#10b981',
+              500: '#10b981',
+              600: '#059669',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    body {
+      font-family: 'Cairo', sans-serif;
+      background-color: #0b0f14;
+      color: #f1f5f9;
+      overflow-x: hidden;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #11161d;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #283444;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #10b981;
+    }
+
+    /* Print Styles for A4 Custody Sheet */
+    @media print {
+      @page {
+        size: A4 landscape;
+        margin: 6mm;
+      }
+      body {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      #printSheetContainer {
+        display: block !important;
+        width: 100% !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-charcoal-950 text-slate-100 antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed bottom-5 left-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none no-print"></div>
+
+  <!-- Dedicated Print Container (Matches PDF Preview 100%) -->
+  <div id="printSheetContainer" class="hidden"></div>
+
+  <!-- Top Navigation Header -->
+  <header class="sticky top-0 z-30 bg-charcoal-900/90 backdrop-blur-md border-b border-slate-800/80 no-print">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      <!-- Brand & Project Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-lg shadow-emerald-950/50 border border-emerald-400/20 shrink-0">
+          <i data-lucide="package-search" class="w-6 h-6 text-white"></i>
+        </div>
+        <div>
+          <h1 class="text-base sm:text-lg font-extrabold text-white tracking-tight">قسم العهدة</h1>
+          <p class="text-xs text-emerald-400/90 font-semibold mt-0.5">مشروع : مستقبل مصر 400 ألف فدان - زون جي</p>
+        </div>
+      </div>
+
+      <!-- Sync Status & Excel Upload Button -->
+      <div class="flex items-center gap-2.5 sm:gap-3">
+        <!-- Cloud Sync Pill -->
+        <div id="syncStatusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-charcoal-800 border border-slate-700/70 text-xs">
+          <span id="syncDot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+          <div class="flex flex-col">
+            <span id="syncText" class="font-semibold text-slate-200 leading-none">جاري الاتصال السحابي...</span>
+            <span id="lastUpdatedText" class="text-[10px] text-slate-400 mt-0.5">بيانات المشروع المدمجة</span>
+          </div>
+        </div>
+
+        <!-- Excel File Upload Trigger -->
+        <label for="excelUploadInput" class="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-bold text-xs sm:text-sm shadow-lg shadow-emerald-950/50 transition-all">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+          <span>رفع شيت الإكسيل</span>
+        </label>
+        <input type="file" id="excelUploadInput" accept=".xlsx,.xls" class="hidden" />
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Smart Autocomplete Search Hero Section -->
+    <section class="bg-charcoal-900 border border-slate-800/90 rounded-3xl p-4 sm:p-6 shadow-2xl relative no-print">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+        <div>
+          <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="search" class="w-5 h-5 text-emerald-400"></i>
+            <span>مربع البحث</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">اكتب أي حروف من اسم المستلم أو رقمه الوظيفي أو اسم العُهدة وستظهر الاقتراحات فوراً</p>
+        </div>
+
+        <!-- Search Scope Filter Pills -->
+        <div class="flex flex-wrap items-center gap-1.5 bg-charcoal-950 p-1.5 rounded-2xl border border-slate-800" id="searchScopeTabs">
+          <button type="button" data-scope="all" class="scope-btn active px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-emerald-600 text-white shadow">
+            الكل
+          </button>
+          <button type="button" data-scope="person" class="scope-btn px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-400 hover:text-white">
+            اسم المستلم
+          </button>
+          <button type="button" data-scope="code" class="scope-btn px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-400 hover:text-white">
+            الكود الوظيفي
+          </button>
+          <button type="button" data-scope="item" class="scope-btn px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-400 hover:text-white">
+            التوصيف العربي
+          </button>
+        </div>
+      </div>
+
+      <!-- Search Input Wrapper with Autocomplete Dropdown -->
+      <div class="relative" id="searchWrapper">
+        <div class="relative flex items-center">
+          <div class="absolute right-4 text-emerald-400 pointer-events-none">
+            <i data-lucide="search" class="w-5 h-5"></i>
+          </div>
+          <input
+            type="text"
+            id="smartSearchInput"
+            autocomplete="off"
+            placeholder="ابحث هنا... مثال: صلاح محمد، أو 10204775، أو صاروخ 9 بوصة..."
+            class="w-full bg-charcoal-950 border-2 border-slate-700/80 focus:border-emerald-500 rounded-2xl py-3.5 sm:py-4 pr-12 pl-24 text-sm sm:text-base text-white placeholder-slate-500 outline-none transition-all shadow-inner"
+          />
+          <div class="absolute left-3 flex items-center gap-1.5">
+            <button
+              type="button"
+              id="clearSearchBtn"
+              title="مسح البحث"
+              class="hidden px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all flex items-center gap-1"
+            >
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              <span>مسح</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Autocomplete Suggestions Dropdown -->
+        <div
+          id="autocompleteDropdown"
+          class="hidden absolute left-0 right-0 top-full mt-2 bg-charcoal-850 border border-slate-700 rounded-2xl shadow-2xl z-40 max-h-96 overflow-y-auto divide-y divide-slate-800/80"
+        ></div>
+      </div>
+
+      <!-- Quick Access Chips (Top Recipients & Common Items) -->
+      <div class="mt-4 flex flex-wrap items-center gap-2 text-xs">
+        <span class="text-slate-400 font-semibold flex items-center gap-1">
+          <i data-lucide="zap" class="w-3.5 h-3.5 text-emerald-400"></i>
+          وصول سريع:
+        </span>
+        <div id="quickChipsContainer" class="flex flex-wrap gap-1.5"></div>
+      </div>
+    </section>
+
+    <!-- Selected Entity Profile Banner (Appears when a Person, EmpCode, or Item is selected) -->
+    <section id="selectedEntityCard" class="hidden bg-gradient-to-l from-charcoal-900 via-charcoal-900 to-emerald-950/30 border border-emerald-500/30 rounded-3xl p-5 shadow-xl print-card">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div class="flex items-start sm:items-center gap-4">
+          <div id="entityAvatar" class="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+            <i data-lucide="user-check" class="w-7 h-7"></i>
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span id="entityTypeBadge" class="px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">ملف مستلم عُهدة</span>
+              <span id="entityCodeBadge" class="px-2.5 py-0.5 rounded-lg text-xs font-mono font-bold bg-charcoal-950 text-slate-300 border border-slate-700"></span>
+            </div>
+            <h3 id="entityTitle" class="text-lg sm:text-xl font-extrabold text-white mt-1.5"></h3>
+            <div id="entityMeta" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300 mt-1"></div>
+          </div>
+        </div>
+
+        <!-- Action Buttons: WhatsApp PDF Share / PDF Preview / Print / Show All -->
+        <div class="flex flex-wrap items-center gap-2 no-print">
+          <button
+            type="button"
+            id="whatsappPdfBannerBtn"
+            title="إرسال كشف العهدة PDF مباشرة عبر واتساب"
+            class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] active:scale-95 text-white shadow-lg shadow-[#25D366]/25 transition-all"
+          >
+            <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12.031 2c-5.516 0-9.969 4.453-9.969 9.969 0 1.758.459 3.473 1.332 4.986L2 22l5.188-1.361a9.927 9.927 0 0 0 4.843 1.26h.004c5.515 0 9.969-4.454 9.969-9.969 0-2.663-1.037-5.167-2.92-7.05A9.903 9.903 0 0 0 12.031 2zm5.821 14.28c-.244.687-1.418 1.314-1.976 1.396-.508.075-1.15.107-1.855-.117-.428-.136-.977-.318-1.68-.622-2.957-1.277-4.888-4.254-5.035-4.45-.147-.196-1.202-1.599-1.202-3.05 0-1.451.76-2.164 1.03-2.459.27-.295.589-.369.785-.369.196 0 .393.002.564.01.181.009.424-.069.663.506.245.59.833 2.033.906 2.181.074.147.123.319.025.515-.098.196-.147.319-.295.491-.147.172-.309.384-.442.515-.147.147-.301.307-.129.602.172.295.763 1.259 1.638 2.039 1.125 1.003 2.073 1.314 2.368 1.461.295.147.467.123.639-.074.172-.196.737-.86.933-1.155.196-.295.393-.246.663-.147.27.098 1.718.81 2.013.958.295.147.491.221.564.344.074.123.074.712-.17 1.399z"/>
+            </svg>
+          </button>
+          <button
+            type="button"
+            id="previewPdfBannerBtn"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 text-xs font-bold transition-all"
+          >
+            <i data-lucide="file-text" class="w-4 h-4"></i>
+            <span>معاينة PDF</span>
+          </button>
+          <button
+            type="button"
+            id="printReportBtn"
+            class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-600 text-xs font-bold transition-all"
+          >
+            <i data-lucide="printer" class="w-4 h-4"></i>
+            <span>طباعة</span>
+          </button>
+          <button
+            type="button"
+            id="resetSelectionBtn"
+            class="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-charcoal-950 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-bold transition-all"
+          >
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+            <span>عرض الكل</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Dynamic KPI Summary Cards -->
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <!-- Total Rows -->
+      <div class="bg-charcoal-900 border border-slate-800 rounded-2xl p-4 print-card">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-400">إجمالي بنود العُهدة</span>
+          <div class="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-slate-300 no-print">
+            <i data-lucide="layers" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="statTotalRows" class="text-2xl sm:text-3xl font-extrabold text-white font-mono">0</span>
+          <span class="text-xs text-slate-400">بند</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-1">إجمالي الكميات: <strong id="statTotalQty" class="text-slate-200 font-mono">0</strong> وحدة</p>
+      </div>
+
+      <!-- Active (مستمرة) -->
+      <div class="bg-charcoal-900 border border-emerald-500/25 rounded-2xl p-4 print-card">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-emerald-400">عُهد مستمرة (في الذمة)</span>
+          <div class="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-400 no-print">
+            <i data-lucide="shield-alert" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="statActiveRows" class="text-2xl sm:text-3xl font-extrabold text-emerald-400 font-mono">0</span>
+          <span class="text-xs text-emerald-300/80">بند</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-1">الكمية المستمرة: <strong id="statActiveQty" class="text-emerald-300 font-mono">0</strong> وحدة</p>
+      </div>
+
+      <!-- Returned (ارتجاع) -->
+      <div class="bg-charcoal-900 border border-slate-800 rounded-2xl p-4 print-card">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-sky-400">عُهد مرتجعة (مُسلّمة)</span>
+          <div class="w-9 h-9 rounded-xl bg-sky-500/15 flex items-center justify-center text-sky-400 no-print">
+            <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="statReturnedRows" class="text-2xl sm:text-3xl font-extrabold text-sky-400 font-mono">0</span>
+          <span class="text-xs text-sky-300/80">بند</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-1">الكمية المرتجعة: <strong id="statReturnedQty" class="text-sky-300 font-mono">0</strong> وحدة</p>
+      </div>
+
+      <!-- Unique Recipients / Items -->
+      <div class="bg-charcoal-900 border border-slate-800 rounded-2xl p-4 print-card">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-amber-400">المستلمون / الأصناف</span>
+          <div class="w-9 h-9 rounded-xl bg-amber-500/15 flex items-center justify-center text-amber-400 no-print">
+            <i data-lucide="users" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="statUniquePeople" class="text-2xl sm:text-3xl font-extrabold text-amber-400 font-mono">0</span>
+          <span class="text-xs text-slate-400">مستلم</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-1">أصناف مختلفة: <strong id="statUniqueItems" class="text-amber-300 font-mono">0</strong> صنف</p>
+      </div>
+    </section>
+
+    <!-- Results Table & Status Filter Section -->
+    <section class="bg-charcoal-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl print-card">
+      <!-- Table Toolbar -->
+      <div class="p-4 sm:p-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
+        <div class="flex items-center gap-2">
+          <h3 class="text-base font-bold text-white" id="tableHeading">سجل العُهد التفصيلي</h3>
+          <span id="visibleBadgeCount" class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-slate-800 text-emerald-400">0</span>
+        </div>
+
+        <!-- Status Filter Buttons -->
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="inline-flex rounded-xl bg-charcoal-950 p-1 border border-slate-800" id="statusFilterGroup">
+            <button type="button" data-status="all" class="status-filter-btn active px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-white transition-all">
+              الكل
+            </button>
+            <button type="button" data-status="مستمرة" class="status-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-emerald-400 transition-all">
+              مستمرة فقط
+            </button>
+            <button type="button" data-status="ارتجاع" class="status-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-sky-400 transition-all">
+              مرتجعة فقط
+            </button>
+          </div>
+
+          <!-- WhatsApp PDF Share Icon Button -->
+          <button
+            type="button"
+            id="whatsappPdfTableBtn"
+            class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] active:scale-95 text-white shadow-md shadow-[#25D366]/20 transition-all"
+            title="مشاركة الجدول الحالي PDF عبر واتساب"
+          >
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12.031 2c-5.516 0-9.969 4.453-9.969 9.969 0 1.758.459 3.473 1.332 4.986L2 22l5.188-1.361a9.927 9.927 0 0 0 4.843 1.26h.004c5.515 0 9.969-4.454 9.969-9.969 0-2.663-1.037-5.167-2.92-7.05A9.903 9.903 0 0 0 12.031 2zm5.821 14.28c-.244.687-1.418 1.314-1.976 1.396-.508.075-1.15.107-1.855-.117-.428-.136-.977-.318-1.68-.622-2.957-1.277-4.888-4.254-5.035-4.45-.147-.196-1.202-1.599-1.202-3.05 0-1.451.76-2.164 1.03-2.459.27-.295.589-.369.785-.369.196 0 .393.002.564.01.181.009.424-.069.663.506.245.59.833 2.033.906 2.181.074.147.123.319.025.515-.098.196-.147.319-.295.491-.147.172-.309.384-.442.515-.147.147-.301.307-.129.602.172.295.763 1.259 1.638 2.039 1.125 1.003 2.073 1.314 2.368 1.461.295.147.467.123.639-.074.172-.196.737-.86.933-1.155.196-.295.393-.246.663-.147.27.098 1.718.81 2.013.958.295.147.491.221.564.344.074.123.074.712-.17 1.399z"/>
+            </svg>
+          </button>
+
+          <!-- PDF Preview Button -->
+          <button
+            type="button"
+            id="previewPdfTableBtn"
+            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 text-xs font-bold transition-all"
+            title="معاينة كشف العهدة بصيغة PDF قبل الإرسال"
+          >
+            <i data-lucide="file-text" class="w-4 h-4"></i>
+            <span>معاينة PDF</span>
+          </button>
+
+          <button
+            type="button"
+            onclick="triggerUnifiedPrint()"
+            class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all"
+            title="طباعة الجدول الحالي"
+          >
+            <i data-lucide="printer" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Responsive Table Wrapper -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-right border-collapse">
+          <thead>
+            <tr class="bg-charcoal-950/90 border-b border-slate-800 text-slate-400 text-xs font-bold">
+              <th class="py-3.5 px-3 whitespace-nowrap">م</th>
+              <th class="py-3.5 px-3 whitespace-nowrap">رقم العهدة</th>
+              <th class="py-3.5 px-3 whitespace-nowrap">تاريخ العهدة</th>
+              <th class="py-3.5 px-3 whitespace-nowrap">الكود</th>
+              <th class="py-3.5 px-3 min-w-[200px]">توصيف عربي</th>
+              <th class="py-3.5 px-3 whitespace-nowrap text-center">الوحدة</th>
+              <th class="py-3.5 px-3 whitespace-nowrap text-center">الكمية</th>
+              <th class="py-3.5 px-3 min-w-[170px]">المستلم</th>
+              <th class="py-3.5 px-3 whitespace-nowrap">الوظيفة</th>
+              <th class="py-3.5 px-3 whitespace-nowrap">الكود الوظيفي</th>
+              <th class="py-3.5 px-3 whitespace-nowrap">الهاتف</th>
+              <th class="py-3.5 px-3 whitespace-nowrap">المدة</th>
+              <th class="py-3.5 px-3 whitespace-nowrap">حالة العهدة</th>
+              <th class="py-3.5 px-3 whitespace-nowrap">تاريخ الارتجاع</th>
+              <th class="py-3.5 px-3 whitespace-nowrap">مقاول</th>
+              <th class="py-3.5 px-3 whitespace-nowrap">سريل</th>
+              <th class="py-3.5 px-3 min-w-[140px]">ملاحظات</th>
+            </tr>
+          </thead>
+          <tbody id="custodyTableBody" class="divide-y divide-slate-800/70 text-xs sm:text-sm">
+            <!-- Rows injected dynamically -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden py-14 px-4 text-center">
+        <div class="w-16 h-16 rounded-2xl bg-slate-800/80 flex items-center justify-center mx-auto text-slate-400 mb-3">
+          <i data-lucide="search-x" class="w-8 h-8"></i>
+        </div>
+        <h4 class="text-base font-bold text-white">لا توجد نتائج مطابقة لبحثك</h4>
+        <p class="text-xs text-slate-400 mt-1">جرب البحث بجزء آخر من الاسم أو الكود الوظيفي أو اسم الصنف</p>
+      </div>
+
+      <!-- Pagination / Load More Footer -->
+      <div id="tableFooter" class="p-4 bg-charcoal-950/60 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400 no-print">
+        <span id="paginationInfo">عرض 0 من 0 سجل</span>
+        <div class="flex items-center gap-2">
+          <button type="button" id="loadMoreBtn" class="hidden px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold transition-all">
+            عرض المزيد (+50 سجل)
+          </button>
+          <button type="button" id="showAllRowsBtn" class="hidden px-4 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold transition-all">
+            عرض الكل دفعة واحدة
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- PDF Preview Modal (Full A4 Landscape Preview before Download / WhatsApp Send) -->
+  <div id="pdfPreviewModal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-2 sm:p-5 no-print">
+    <div class="bg-charcoal-900 border border-slate-700 rounded-3xl w-full max-w-[1240px] max-h-[94vh] flex flex-col shadow-2xl overflow-hidden">
+      <!-- Modal Top Action Bar -->
+      <div class="px-4 sm:px-6 py-3.5 bg-charcoal-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
+            <i data-lucide="file-check-2" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-sm sm:text-base font-extrabold text-white">معاينة كشف العهدة (A4 بالعرض — جميع الأعمدة)</h3>
+            <p class="text-[11px] text-slate-400">تأكد من كافة البيانات قبل التحميل أو الإرسال عبر واتساب</p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Send via WhatsApp -->
+          <button
+            type="button"
+            id="modalSendWhatsappBtn"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] active:scale-95 text-white text-xs font-extrabold shadow-lg shadow-[#25D366]/20 transition-all"
+          >
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12.031 2c-5.516 0-9.969 4.453-9.969 9.969 0 1.758.459 3.473 1.332 4.986L2 22l5.188-1.361a9.927 9.927 0 0 0 4.843 1.26h.004c5.515 0 9.969-4.454 9.969-9.969 0-2.663-1.037-5.167-2.92-7.05A9.903 9.903 0 0 0 12.031 2zm5.821 14.28c-.244.687-1.418 1.314-1.976 1.396-.508.075-1.15.107-1.855-.117-.428-.136-.977-.318-1.68-.622-2.957-1.277-4.888-4.254-5.035-4.45-.147-.196-1.202-1.599-1.202-3.05 0-1.451.76-2.164 1.03-2.459.27-.295.589-.369.785-.369.196 0 .393.002.564.01.181.009.424-.069.663.506.245.59.833 2.033.906 2.181.074.147.123.319.025.515-.098.196-.147.319-.295.491-.147.172-.309.384-.442.515-.147.147-.301.307-.129.602.172.295.763 1.259 1.638 2.039 1.125 1.003 2.073 1.314 2.368 1.461.295.147.467.123.639-.074.172-.196.737-.86.933-1.155.196-.295.393-.246.663-.147.27.098 1.718.81 2.013.958.295.147.491.221.564.344.074.123.074.712-.17 1.399z"/>
+            </svg>
+            <span>إرسال عبر واتساب ويب</span>
+          </button>
+
+          <!-- Download PDF -->
+          <button
+            type="button"
+            id="modalDownloadPdfBtn"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-bold transition-all"
+          >
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span>تحميل PDF</span>
+          </button>
+
+          <!-- Print -->
+          <button
+            type="button"
+            id="modalPrintPdfBtn"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 text-xs font-bold transition-all"
+          >
+            <i data-lucide="printer" class="w-4 h-4"></i>
+            <span>طباعة</span>
+          </button>
+
+          <!-- Close Modal -->
+          <button
+            type="button"
+            id="closePdfPreviewBtn"
+            class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white transition-all"
+            title="إغلاق المعاينة"
+          >
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Scrollable A4 Landscape Paper Preview Container -->
+      <div class="flex-1 overflow-auto bg-slate-800/90 p-4 sm:p-6 flex justify-center items-start">
+        <div
+          id="pdfPreviewPaper"
+          class="flex flex-col gap-6 items-center shrink-0"
+          style="width: 1122px;"
+        >
+          <!-- Exact A4 Landscape pages injected dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase & App Logic -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // =========================================================================
+    // 1. INITIAL EMBEDDED DATASET FROM "TOOLS عهده.xlsx"
+    // =========================================================================
+    const INITIAL_DATA = {
+      s: [
+        ["19991792", "محمد سعيد محمد شحاته", "مدير تنفيذ", "1080775000", "28404041701713"],
+        ["10212654", "محمد صلاح محمود جمعه", "امين مخزن", "1285316161", "29805011213151"],
+        ["10212405", "احمد ماهر محمد محمد", "مشرف السلامه والصحه المهنيه", "1117746848", "29207101802593"],
+        ["10212375", "يوسف ابراهيم يوسف عبداللطيف", "مهندس تنفيذ كهرباء", "1019788073", "30207291200611"],
+        ["10212288", "صلاح محمد عبد الرازق امين", "مهندس جوده ميكانيكا", "1062494836", "29801011371096"],
+        ["10212163", "تامر جمعة عمر جمعة حسين", "سواق حفار", "1275827798", "29805301800336"],
+        ["10211977", "احمد قدرى عبدالمطلب", "مهندس مكتب فني", "1068741600", "29510301700731"],
+        ["10211975", "عبدالرحمن خالد محمد", "منسق مستندات", "1096710831", "29505161801635"],
+        ["10211737", "احمد شوقى محمد الشرنوبى", "مدير مكتب فنى", "1099747414", "29606041800857"],
+        ["10210953", "رامي محمود عرفة مصطفى", "منسق مستندات", "1121214046", "28409201602395"],
+        ["10210350", "مدحت محمد عبد الفتاح خليل", "مدير الأمن", "1140773377", "27410200105333"],
+        ["10209992", "اسامه عبده محمد حماد", "مشرف امن اداري", "1284240805", "27401131702317"],
+        ["10209379", "احمد الهادى محيى عبدالحميد", "مهندس مراقبة التكاليف", "1126664776", "29807111201951"],
+        ["10209210", "اسلام ثروت عبد ربه متولي", "مهندس تنفيذ", "1099819458", "29603181200818"],
+        ["10209128", "ابراهيم احمد خيري", "مهندس اول كهرباء", "01150100457", "29112011701673"],
+        ["10209123", "احمد على محمود الخامى", "مهندس جوده", "01025216714", "29411231801412"],
+        ["10209110", "هشام عبادى احمد حمد", "مشرف السلامه والصحه المهنيه", "01276420613", "29606062703916"],
+        ["10208979", "عبد السلام حلمي عبد السلام الصقار", "فنى تشغيل", "1020247809", "27212231701396"],
+        ["10208951", "محمد عبدالمنعم عفيفي محمد", "مشرف جوده", "1014486874", "28709261304095"],
+        ["10208942", "بلال السيد محمد محمود الوحش", "ريس قسم الجوده", "01014486874", "28807250202233"],
+        ["10208880", "محمد ابراهيم زكى اسماعيل خزيمى", "مساح", "1096545314", "29702261500799"],
+        ["10208769", "محمد سعيد السيد على", "مهندس حصر", "01114295084", "29606031400192"],
+        ["10208728", "احمد طارق جوده محمود موسى", "مهندس حصر", "01023846743", "30004131201834"],
+        ["10208625", "سامح محمد عبده احمد سالم", "مهندس جوده", "1203552211", "29708101100792"],
+        ["10208572", "مصطفى سامى مصطفى عمر", "مشرف تنفيذ", "1093555384", "28801231403319"],
+        ["10208571", "احمد عادل محمد على فوده", "مشرف تنفيذ", "1063226090", "29003061401731"],
+        ["10208520", "ابراهيم محمد ابراهيم صالح", "مهندس اول تنفيذ", "1090094866", "29012061600636"],
+        ["10208489", "محمد احمد عبد الحكيم عبدالوهاب سلم", "رسام", "1228825886", "29109020200431"],
+        ["10208482", "احمد محمد السيد محمد", "مهندس تنفيذ", "1018035911", "29912051201394"],
+        ["10208414", "امير محمد نبيل  عبدالعال الصقوري", "منسق مستندات", "1098831130", "29708141300093"],
+        ["10208411", "أحمد محمدمخيمر عبدالعال", "مهندس حصر", "1122508059", "29805262502195"],
+        ["10208205", "طه محمد على عبداللطيف", "مهندس صيانة أول", "1010094354", "26907132200495"],
+        ["10207841", "علي عادل أحمد محمد", "مهندس اول كهرباء", "1064824014", "29301012641213"],
+        ["10206923", "سعد سمير عبد الرؤوف", "سائق حفار", "1050737751", "29301201802872"],
+        ["10206831", "السيد محمد ابراهيم محمد", "مشررف امن صناعى", "1002233847", "28004081203351"],
+        ["10206555", "نبيل ابراهيم حسن يوسف عنان", "سائق حفار", "1556997015", "27902031203177"],
+        ["10206511", "عبدالعزيز ابراهيم ابراهيم علي مصطفي", "مهندس اول تنفيذ", "1065332252", "29308011203993"],
+        ["10206445", "عادل شوقى عزيز جاد الله", "مدير تنفيذ", "1276688516", "28210171702154"],
+        ["10206309", "محمد محمود ابوزيد حسين", "مشرف تنفيذ", "122288470", "27812202702038"],
+        ["10206017", "احمد مجدى فتوح صالح", "مهندس اول جوده", "1021278599", "29011171201935"],
+        ["10206006", "خالد حسن الانور حامد", "مهندس اول تنفيذ", "1016227672", "29201011302836"],
+        ["10205729", "محمد عمران على عمران", "مشرف تنفيذ", "1099803594", "29110012203615"],
+        ["10205724", "ناجى محمد على عبدالعال", "مشرف تنفيذ", "1116178259", "28501092605536"],
+        ["10205527", "محمد عادل انور الكافورى", "امين مخزن", "1018956504", "28703041600078"],
+        ["10205405", "احمد خليل حسن على", "شيف مساحه", "1110732372", "28310101306652"],
+        ["10205244", "محمود احمد محمد يوسف الدسوقي", "شيف مساحه", "1144126845", "28711161602077"],
+        ["10205217", "حسن احمد مصطفى حسن", "منسق اول ادارى", "1270996335", "29003211901011"],
+        ["10205184", "محمد سعد عطيه ابراهيم", "امين مخزن اول", "1013846823", "28008310200634"],
+        ["10205098", "اسلام  عثمان  اسماعيل على", "منسق اول ادارى", "1017579579", "29107011323799"],
+        ["10205007", "مصطفى ايمن احمد", "مهندس اول تخطيط", "1018357459", "29609092400071"],
+        ["10204775", "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "1011013532", "27803161301431"],
+        ["10204598", "محمد عبدالقادر عبداللطيف", "مهندس قطاع", "1283309838", "28110200203416"],
+        ["10204232", "رافت جمال عبدالفتاح الكرساوى", "مشرف تنفيذ", "1552799788", "28110061600375"],
+        ["10203853", "ابراهيم السيد مصطفى احمد", "سائق لودر", "1024564097", "28012201500471"],
+        ["10203746", "عمرو هارون محمد احمد", "سائق حفار", "1283629093", "29312012702711"],
+        ["10203532", "محفوظ حلمى محمد احمد", "مشرف تنفيذ", "1159718140", "26809022600739"],
+        ["10203275", "احمد سامى مرزوق بدوى", "سائق", "1144566573", "28512151700795"],
+        ["10202364", "محمد محمد كمال بكرى شحاته", "شيف مكتب فني", "1001343491", "28410161301891"],
+        ["10202015", "محمد احمد عبد اللطيف شوقي احمد", "مهندس تنفيذ اول ميكانيكا", "1200382138", "28809261602813"],
+        ["10201845", "أكرم احمد ابو الحمد احمد مصطفي", "مهندس قطاع", "1202000768", "28602010202952"],
+        ["10201838", "اسلام محمد محمد موسى", "مهندس قطاع", "1060005368", "29109241200231"],
+        ["10201536", "ناديه عبدالقوى عبدالمقصود خليل", "شيف مكتب فنى", "1068856707", "29104121800241"],
+        ["10201485", "ناصر محمد الغريب عبدالله على", "مشرف تنفيذ", "1223341961", "26311220101715"],
+        ["10201472", "احمد محمد محمد عبدالحق", "مهندس اول كهرباء", "1201237982", "29301011233936"],
+        ["10201410", "محمد علاء الدين عبدالعليم الشحات", "مهندس اول جوده", "1022388393", "29410051400898"],
+        ["10201403", "حسام سعيد صديق حسانين", "اخصائي اول نظم معلومات", "1277532099", "29003202101672"],
+        ["10201115", "محمود عبدالمرضي عبدالمرضى عطيه", "سائق", "1155112659", "28911011411116"],
+        ["10200953", "اسلام احمد عبدرابه فرهود", "ريس قسم الجوده", "1027507035", "28901011818831"],
+        ["10200905", "محمد فتحى مصطفى محمد", "مدير قطاع الجودة", "1030427111", "27603241700559"],
+        ["10200801", "احمد عبدالله حسن عبدالله", "مهندس اول حصر", "1123888270", "29204152401675"],
+        ["10200728", "مصرى سعد جمعه سعد", "مشرف تنفيذ", "1210774951", "26604050104151"],
+        ["10200622", "أحمد عبد الحافظ عبد المقصود سلمان", "مهندس قطاع", "1118001175", "28507281200553"],
+        ["10200518", "مرزوق جمعه راضى حسين", "مشرف السلامه والصحه المهنيه", "1289038433", "27312182201697"],
+        ["10200006", "نور عبدالرؤف محمد حمامو", "سائق", "1013695330", "27412051500332"],
+        ["10115650", "محمد غانم رشاد أحمد", "رئيس قسم السلامه والصحه المهنيه", "1094169338", "28707310100554"],
+        ["10114256", "احمد عز عبد المنعم فهيم", "مساح اول", "1023223262", "29206202402053"],
+        ["10088060", "رافت محمد مبروك متولي", "شيف مساحه", "1008544857", "28609222201314"],
+        ["10074480", "محمد عاطف عبدالروؤف", "مهندس قطاع", "0 12 8396897", "28904131700077"],
+        ["10047616", "ياسين صالح احمد خضر", "منسق اول موارد بشريه", "1226869017", "28512072200931"],
+        ["10043391", "محمد فرج عبدالعال محمد", "سائق جرار", "1274732756", "29102201305817"],
+        ["10034166", "محمد ايمن احمد جاد", "مهندس قطاع", "1006167107", "28610111200058"],
+        ["10010615", "خالد محمود جادالله عبداللاهى", "مهندس قطاع ميكانيكا", "1018609292", "28901170200376"],
+        ["10008728", "محب وديع القمص بولس", "مهندس قطاع", "1224700526", "28711192200112"],
+        ["10007623", "اسلام السيد محمد محمد", "امين مخزن اول", "1204360343", "29108120102511"],
+        ["10007412", "عادل عبد الغنى على علوان", "مندوب مشتريات", "1015994422", "27601261401059"],
+        ["10007142", "ياسر فتحى محمد حسن", "مدير مشروع", "1221075525", "26703100400293"],
+        ["10006379", "محمد مصطفى يوسف عبد الموجود", "مدير المكتب الفني", "1000352706", "26703150200678"],
+        ["10006268", "احمد الهادى محمد محمد", "مشرف تنفيذ", "1202637005", "28210141300679"],
+        ["10004628", "كريم عادل مصطفى خطاب", "مدير تنفيذ", "1022959449", "28006141601818"],
+        ["10004518", "بيشوى سمير عياد جاد بولس", "مهندس قطاع", "1272696267", "28608261701999"],
+        ["10004502", "صموئيل ثروت عوض الله", "مهندس قطاع كهرباء", "1004725661", "27910082400778"],
+        ["10003796", "محسن الطوخى ابراهيم الطوخى", "مشرف جوده", "1284171701", "27608241301737"],
+        ["10003793", "ايمن جاد عبدالوهاب جاد", "مدير ورشه", "1120378388", "27506301200695"],
+        ["10003034", "حمدى كامل محمدين سليمان", "امين مخزن", "1007425477", "26911090104838"],
+        ["10002832", "احمد سامى حامد", "مدير مشروع", "1099848930", "28410091900334"],
+        ["10000835", "حاتم ابوسليمان عبده السيد", "سائق لودر", "1212286801", "26810010102995"]
+      ],
+      c: [
+        ["553", "2026-05-25", "", "عداد ديجيتال", "عدد", 1, "ابراهيم خلف", "", "", "", "مستمرة", "", "احمد ممدوح", "", "مقطورة السولار"],
+        ["554", "2026-05-25", "LP.41.36.26.16.12.01.09.T00001", "صاروخ 9 بوصة", "عدد", 1, "عبد السلام حلمى عبد السلام الصقار", "فنى تشغيل", "10208979", "1020247809", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["554", "2026-05-25", "LH.41.36.26.23.20.15.00.T00001", "راتش 3طن اصفر", "عدد", 1, "عبد السلام حلمى عبد السلام الصقار", "فنى تشغيل", "10208979", "1020247809", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["554", "2026-05-25", "LH.41.36.26.16.29.01.05.T00001", "عفريتة رفع 5طن", "عدد", 1, "عبد السلام حلمى عبد السلام الصقار", "فنى تشغيل", "10208979", "1020247809", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["555", "2026-01-06", "LP.41.36.26.16.12.01.09.000001", "صاروخ 9 بوصة", "عدد", 1, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "421011232", ""],
+        ["555", "2026-01-06", "LP.41.36.26.16.12.01.05.T00001", "صاروخ 5 بوصة", "عدد", 1, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "425033416", ""],
+        ["555", "2026-01-06", "LP.41.36.26.16.12.01.05.T00001", "صاروخ 5 بوصة", "عدد", 1, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "425033651", ""],
+        ["555", "2026-01-06", "LP.41.36.26.16.35.01.02.T00001", "( APT ) ماكينه لحام بولى بالشنطه", "عدد", 1, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "مقاس 20مم الى 40مم 4 لقمة", ""],
+        ["555", "2026-01-06", "LP.41.36.26.16.10.11.12.T00001", "هيلتي شنيور ديوليت اصفر26", "عدد", 1, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "50046", ""],
+        ["555", "2026-01-06", "LP.41.36.26.16.10.01.05.T00001", "هيلتى 45 مم بوش أزرق", "عدد", 1, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "426004007", ""],
+        ["555", "2026-01-06", "", "ماكينة اختبار 60بار", "عدد", 1, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["556", "2026-01-06", "", "سلم فردى 6 متر", "عدد", 1, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["556", "2026-01-06", "", "مفتاح انجليزى 18\"", "عدد", 1, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["556", "2026-01-06", "", "مفتاح فلاتر جنزير 12\"", "عدد", 2, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["556", "2026-01-06", "LP.41.36.26.16.10.11.12.T00001", "هيلتي شنيور ديوليت اصفر26", "عدد", 1, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "25133", ""],
+        ["559", "2026-02-06", "LH.11.01.10.16.78.10.00.T00001", "قفل واير 10", "عدد", 2, "احمد ابراهيم سعد جاب الله", "مشرف تنفيذ", "29501101805571", "", "مستمرة", "", "", "", "اعتماد م محمد عاطف"],
+        ["559", "2026-02-06", "", "شوكة باليد", "عدد", 1, "احمد ابراهيم سعد جاب الله", "مشرف تنفيذ", "29501101805571", "", "ارتجاع", "2026-11-22", "", "", "تكهين"],
+        ["559", "2026-02-06", "", "مفتاح مشرشر/عادى 17مم", "عدد", 1, "احمد ابراهيم سعد جاب الله", "مشرف تنفيذ", "29501101805571", "", "ارتجاع", "2026-11-22", "", "", "اعتماد م محمد عاطف"],
+        ["559", "2026-02-06", "", "مطرقة 2كجم", "عدد", 2, "احمد ابراهيم سعد جاب الله", "مشرف تنفيذ", "29501101805571", "", "ارتجاع", "2026-11-22", "", "", "تكهين"],
+        ["559", "2026-02-06", "", "براويطه", "عدد", 2, "احمد ابراهيم سعد جاب الله", "مشرف تنفيذ", "29501101805571", "", "ارتجاع", "2026-11-22", "", "", "اعتماد م محمد عاطف"],
+        ["559", "2026-02-06", "", "مهزه", "عدد", 1, "احمد ابراهيم سعد جاب الله", "مشرف تنفيذ", "29501101805571", "", "ارتجاع", "2026-11-19", "", "", "تكهين"],
+        ["563", "2026-06-06", "", "مفتاح فرنساوى 30مم", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["563", "2026-06-06", "", "مفتاح  مشرشر / عادى مقاس 30", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["563", "2026-06-06", "", "مفتاح  مشرشر / عادى مقاس 27", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["563", "2026-06-06", "", "مفتاح  مشرشر / عادى مقاس 24", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["563", "2026-06-06", "", "مفتاح  مشرشر / عادى مقاس 22", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["563", "2026-06-06", "", "مفتاح  مشرشر / عادى مقاس 14", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["563", "2026-06-06", "", "مفتاح  مشرشر / عادى مقاس 13", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["563", "2026-06-06", "", "مفتاح  مشرشر / عادى مقاس 12", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["563", "2026-06-06", "", "مفتاح  مشرشر / عادى مقاس 10", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["563", "2026-06-06", "", "مفتاح  مشرشر / عادى مقاس 8", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["563", "2026-06-06", "", "مفتاح بلدى /بلدى مقاس 16/17", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["566", "2026-07-06", "", "مفك صليبه كبيرة", "عدد", 1, "علي عادل أحمد محمد", "مهندس اول كهرباء", "10207841", "1064824014", "مستمرة", "", "", "", ""],
+        ["566", "2026-07-06", "LP.41.36.26.16.05.04.10.T00001", "هيلتي احمر TE50", "عدد", 1, "علي عادل أحمد محمد", "مهندس اول كهرباء", "10207841", "1064824014", "مستمرة", "", "", "", ""],
+        ["568", "2026-07-06", "", "شعله بوتجاز", "عدد", 4, "محمد عمران على عمران", "مشرف تنفيذ", "10205729", "1099803594", "مستمرة", "", "العدل", "", ""],
+        ["568", "2026-07-06", "", "انبوبه بوتجاز", "عدد", 3, "محمد عمران على عمران", "مشرف تنفيذ", "10205729", "1099803594", "مستمرة", "", "العدل", "", ""],
+        ["569", "2026-08-06", "", "حزام امان", "عدد", 4, "نشات محمد على", "مشرف شدة معدنية", "", "", "مستمرة", "", "ذاتي", "", ""],
+        ["571", "2026-08-06", "", "براويطه", "عدد", 2, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "", "", ""],
+        ["571", "2026-08-06", "", "كوريك باليد", "عدد", 3, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "", "", ""],
+        ["571", "2026-08-06", "", "جاروف باليد", "عدد", 2, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "", "", ""],
+        ["571", "2026-08-06", "", "واير قماش 6طن  4 م", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "", "", ""],
+        ["579", "2026-06-14", "", "بروه صلب", "عدد", 2, "احمد ابراهيم سعد جاب الله", "مشرف تنفيذ", "29501101805571", "", "ارتجاع", "2026-11-22", "", "", "اعتماد م محمد عاطف"],
+        ["579", "2026-06-14", "", "كوريك باليد", "عدد", 1, "احمد ابراهيم سعد جاب الله", "مشرف تنفيذ", "29501101805571", "", "ارتجاع", "2026-11-19", "", "", "اعتماد م محمد عاطف"],
+        ["579", "2026-06-14", "", "حجارى باليد", "عدد", 1, "احمد ابراهيم سعد جاب الله", "مشرف تنفيذ", "29501101805571", "", "ارتجاع", "2026-11-19", "", "", "اعتماد م محمد عاطف"],
+        ["583", "2026-06-15", "", "ميزان مياه 60سم", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["585", "2026-06-16", "", "طفايه حريق 6كجم", "عدد", 1, "م - خالد جاد الله", "", "10100365", "", "مستمرة", "", "المتحده", "783854", ""],
+        ["592", "2026-06-23", "LP.01.52.13.69.66.02.00.T00001", "ماكينه تغليف A3", "عدد", 1, "هشام عبادي", "", "", "", "مستمرة", "", "", "", ""],
+        ["598", "2026-06-27", "", "فرطاسه محاره", "عدد", 3, "احمد سليمان", "", "10208579", "", "ارتجاع", "2026-11-16", "تكهين 2", "", ""],
+        ["599", "2026-06-27", "", "انبوبه بوتجاز", "عدد", 1, "محمود محمد مصطفى", "", "", "", "مستمرة", "", "", "", "شركة الاسراء"],
+        ["17147", "2025-09-02", "", "حزام امان", "عدد", 3, "محمود عاطف", "", "", "", "ارتجاع", "2026-10-27", "الامانة", "", ""],
+        ["118", "2025-07-23", "", "حزام امان", "عدد", 5, "محمد يحيي شرف", "", "", "", "ارتجاع", "2026-11-16", "فيوتشر كيم بيلدنج", "", ""],
+        ["17407", "2025-10-25", "", "حزام امان", "عدد", 10, "مصطفى صلاح", "", "", "", "مستمرة", "", "احمد ربيع", "", ""],
+        ["432", "2026-02-05", "", "مفتاح بلدى 17", "عدد", 1, "حسن محمد على", "مشرف تنفيذ", "", "", "مستمرة", "", "", "", "اعتماد م محمد عاطف"],
+        ["528", "20/5/2026", "LH.41.36.26.23.83.90.11.000001", "مكبس كابلات", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", ""],
+        ["528", "20/5/2026", "", "لقم مكبس كابلات", "عدد", 20, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "عدد 20 لقمة"],
+        ["541", "2026-05-23", "", "طلمبة غاطس", "عدد", 1, "م ايمن جاد", "", "", "", "مستمرة", "", "", "", "خاصة بالكامب"],
+        ["541", "2026-05-23", "", "خرطوم طلمبة غاطس", "عدد", 1, "م ايمن جاد", "", "", "", "مستمرة", "", "", "", "خاصة بالكامب"],
+        ["284", "2026-08-03", "", "طفاية حريق 6كجم بودره", "عدد", 1, "احمد صلاح", "", "", "", "مستمرة", "", "فيوتشر كيم بيلدنج", "", ""],
+        ["320", "2026-03-29", "", "جهاز صدمات كهرباء", "عدد", 1, "محمود عبد الهادي", "", "", "", "مستمرة", "", "", "", "سائق اسعاف"],
+        ["320", "2026-03-29", "", "جهاز مونتير ميدى تك", "عدد", 1, "محمود عبد الهادي", "", "", "", "مستمرة", "", "", "", "سائق اسعاف"],
+        ["320", "2026-03-29", "", "امبواج", "عدد", 1, "محمود عبد الهادي", "", "", "", "مستمرة", "", "", "", "سائق اسعاف"],
+        ["320", "2026-03-29", "", "جهاز تيولايز ايطالى", "عدد", 1, "محمود عبد الهادي", "", "", "", "مستمرة", "", "", "", "سائق اسعاف"],
+        ["320", "2026-03-29", "", "شنطه اسعافات", "عدد", 1, "محمود عبد الهادي", "", "", "", "مستمرة", "", "", "", "سائق اسعاف"],
+        ["320", "2026-03-29", "", "رقبه طبيه", "عدد", 1, "محمود عبد الهادي", "", "", "", "مستمرة", "", "", "", "سائق اسعاف"],
+        ["320", "2026-03-29", "", "مقص جراحى", "عدد", 1, "محمود عبد الهادي", "", "", "", "مستمرة", "", "", "", "سائق اسعاف"],
+        ["320", "2026-03-29", "", "جهاز قياس ضغط", "عدد", 1, "محمود عبد الهادي", "", "", "", "مستمرة", "", "", "", "سائق اسعاف"],
+        ["320", "2026-03-29", "", "مسند لذوى الاحتياجات الخاصه", "عدد", 1, "محمود عبد الهادي", "", "", "", "مستمرة", "", "", "", "سائق اسعاف"],
+        ["320", "2026-03-29", "", "FC 100A009455", "عدد", 1, "محمود عبد الهادي", "", "", "", "مستمرة", "", "", "", "سائق اسعاف"],
+        ["320", "2026-03-29", "", "حزام نقاله", "عدد", 1, "محمود عبد الهادي", "", "", "", "مستمرة", "", "", "", "سائق اسعاف"],
+        ["342", "2026-07-04", "", "مفتاح انجليزى 18\"", "عدد", 1, "خالد الانور", "", "10206006", "", "ارتجاع", "2026-11-01", "احمد فوزى", "", ""],
+        ["346", "2026-09-04", "", "مقتاح انجليزى 24\"", "عدد", 2, "عبد السلام حلمى عبد السلام الصقار", "", "10208979", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["355", "2026-11-04", "", "انبوبه بوتجاز", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["355", "2026-11-04", "", "بشبورى لحام", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["355", "2026-11-04", "", "خرطوم انبوبة", "عدد", 2, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["355", "2026-11-04", "", "مفتاح مشرشر /عادى 30مم", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["367", "13/4/2026", "", "مفك عادى", "عدد", 1, "محمد صابر محمود", "كهربائي", "", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["367", "13/4/2026", "", "مفك صليبه", "عدد", 1, "محمد صابر محمود", "كهربائي", "", "", "ارتجاع", "2026-11-19", "", "", "اعتماد م طه"],
+        ["367", "13/4/2026", "", "بنسه كهرباء", "عدد", 1, "محمد صابر محمود", "كهربائي", "", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["367", "13/4/2026", "", "قصافة", "عدد", 1, "محمد صابر محمود", "كهربائي", "", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["420", "2026-04-24", "", "مفتاح مشرشر/ عادى 22/20", "عدد", 2, "م اسلام الشناوي", "مهندس تنفيذ", "10201838", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["423", "27/4/2026", "", "كمبروسر  هواء", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["428", "28/4/2026", "", "اجنه تكسير", "عدد", 1, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["428", "28/4/2026", "", "بنسه جاز", "عدد", 2, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["428", "28/4/2026", "", "كلابة", "عدد", 3, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "تكهين 2", "", ""],
+        ["428", "28/4/2026", "", "مقص بولى", "عدد", 3, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["428", "28/4/2026", "", "بروه محاره", "عدد", 3, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["428", "2026-04-28", "", "منشار يدوى", "عدد", 1, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["440", "2026-05-05", "", "مفتاح  مشرشر 24", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["308", "2026-07-08", "", "كلامب امبير", "عدد", 3, "محمد سيد عبدالتواب سيد", "كهرباء", "197524", "1159065274", "مستمرة", "", "", "", ""],
+        ["308", "2026-07-08", "LP.41.36.26.16.05.22.18.000001", "هيتر تسخين", "عدد", 1, "محمد سيد عبدالتواب سيد", "كهرباء", "197524", "1159065274", "مستمرة", "", "", "", ""],
+        ["308", "2026-07-08", "", "طقم لقم", "عدد", 3, "محمد سيد عبدالتواب سيد", "كهرباء", "197524", "1159065274", "مستمرة", "", "", "", ""],
+        ["308", "2026-07-08", "LP.41.36.26.16.07.01.15.000001", "بلاور هواء", "عدد", 1, "محمد سيد عبدالتواب سيد", "كهرباء", "197524", "1159065274", "مستمرة", "", "", "", ""],
+        ["308", "2026-07-08", "LH.41.36.26.23.83.90.11.000001", "مكبس كابلات", "عدد", 1, "محمد سيد عبدالتواب سيد", "كهرباء", "197524", "1159065274", "مستمرة", "", "", "", ""],
+        ["308", "2026-07-08", "", "طقم النكيه عاده", "عدد", 2, "محمد سيد عبدالتواب سيد", "كهرباء", "197524", "1159065274", "مستمرة", "", "", "", ""],
+        ["308", "2026-07-08", "", "طفم النكيه نجمه", "عدد", 1, "محمد سيد عبدالتواب سيد", "كهرباء", "197524", "1159065274", "مستمرة", "", "", "", ""],
+        ["308", "2026-07-08", "", "طقم مفتاح بلدى 12 قطعه", "عدد", 1, "محمد سيد عبدالتواب سيد", "كهرباء", "197524", "1159065274", "مستمرة", "", "", "", ""],
+        ["308", "2026-07-08", "LP.41.24.19.11.33.00.00.000001", "صاروخ 5 بوصة", "عدد", 1, "محمد سيد عبدالتواب سيد", "كهرباء", "197524", "1159065274", "مستمرة", "", "", "", ""],
+        ["308", "2026-07-08", "", "عداد فريون", "عدد", 1, "محمد سيد عبدالتواب سيد", "كهرباء", "197524", "1159065274", "مستمرة", "", "", "", ""],
+        ["936", "2026-02-16", "", "مفتاح  مشرشر /بلدى 60مم", "عدد", 3, "محمود أبو الحمد", "", "", "", "ارتجاع", "2026-11-11", "", "", "اعتماد م اسلام الشناوي"],
+        ["936", "2026-02-16", "", "مفتاح 41 بلدى مشرشر", "عدد", 6, "محمود أبو الحمد", "", "", "", "ارتجاع", "2026-11-11", "", "", "اعتماد م اسلام الشناوي"],
+        ["936", "2026-02-16", "", "مفتاح  مشرشر /بلدى 46 مم", "عدد", 6, "محمود أبو الحمد", "", "", "", "ارتجاع", "2026-11-11", "", "", "اعتماد م اسلام الشناوي"],
+        ["936", "2026-02-16", "", "مفتاح  مشرشر /بلدى 36 مم", "عدد", 10, "محمود أبو الحمد", "", "", "", "ارتجاع", "2026-11-11", "", "", "اعتماد م اسلام الشناوي"],
+        ["936", "2026-02-16", "", "مفتاح  مشرشر /بلدى 30 مم", "عدد", 5, "عبد السلام حلمى عبد السلام الصقار", "", "10208979", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["936", "2026-02-16", "", "مفتاح  مشرشر /بلدى 24 مم", "عدد", 3, "عبد السلام حلمى عبد السلام الصقار", "", "10208979", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["936", "2026-02-16", "", "مفتاح 60 دق عاده", "عدد", 4, "عبد السلام حلمى عبد السلام الصقار", "", "10208979", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["936", "2026-02-16", "", "مفتاح  دق عادى 80مم", "عدد", 2, "عبد السلام حلمى عبد السلام الصقار", "", "10208979", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["936", "2026-02-16", "", "عتله صلب", "عدد", 2, "مصطفى محمد سعيد", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["936", "2026-02-16", "", "طقم مفك عاده", "عدد", 1, "مصطفى محمد سعيد", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["936", "2026-02-16", "", "طقم مفك صليبه", "عدد", 1, "مصطفى محمد سعيد", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["936", "2026-02-16", "", "مفتاح انجليزى 18\"", "عدد", 1, "مصطفى محمد سعيد", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["34238", "2026-02-25", "", "مبرد مياه 2 حنفيه", "عدد", 1, "ياسين صالح", "", "", "", "مستمرة", "", "", "", ""],
+        ["258", "2025-04-08", "", "ميزان خيط 1كجم", "عدد", 1, "م - خالد جاد الله", "", "", "", "مستمرة", "", "", "", ""],
+        ["258", "2025-04-08", "", "ميزان مياه 60سم", "عدد", 1, "م - خالد جاد الله", "", "", "", "مستمرة", "", "", "", ""],
+        ["266", "2025-05-08", "", "استبليزر 3كجم", "عدد", 1, "احمد حسنى عبد الحميد", "", "", "", "مستمرة", "", "", "", "الكانتين"],
+        ["119", "2025-07-23", "", "ميكرويف 28 لتر", "عدد", 1, "اسلام كحيله", "", "", "", "مستمرة", "", "", "", "مهندس احمد عوض"],
+        ["797", "2025-12-29", "", "خرامه ورق كبيره", "عدد", 1, "هشام عباس", "", "", "", "مستمرة", "", "", "", ""],
+        ["783", "2025-12-16", "LH.41.36.26.23.01.02.00.T00043", "مفتاح بلدى دق 41مم  محلى", "عدد", 2, "م اسلام الشناوي", "مهندس تنفيذ", "10201838", "", "مستمرة", "", "", "", ""],
+        ["897", "2026-02-01", "", "مفتاح 46 بلدى مشرشر", "عدد", 2, "عبد السلام حلمى عبد السلام الصقار", "", "10208979", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["897", "2026-02-01", "", "مفتاح 41 بلدى مشرشر", "عدد", 1, "عبد السلام حلمى عبد السلام الصقار", "", "10208979", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["459", "2025-12-20", "LP.41.36.26.16.07.01.15.000001", "بلاور هواء", "عدد", 1, "رامى عرفة", "D.c", "", "", "مستمرة", "", "", "", ""],
+        ["35", "2025-06-07", "", "مفتاح فلاتر قايش", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["35", "2025-06-07", "", "مفتاح 10مم بلدى /مشرشر", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["35", "2025-06-07", "", "مفتاح 12مم بلدى /مشرشر", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["35", "2025-06-07", "", "مفتاح 13مم بلدى /مشرشر", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["35", "2025-06-07", "", "مفتاح 13مم مشرشر", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["35", "2025-06-07", "", "مفتاح 17مم بلدى /مشرشر", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["35", "2025-06-07", "", "مفتاح 17مم بلدى /مشرشر", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["35", "2025-06-07", "", "مفتاح 22مم بلدى /مشرشر", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["35", "2025-06-07", "", "مفتاح 24مم بلدى /مشرشر", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["35", "2025-06-07", "", "طقم النكيه كامل", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["35", "2025-06-07", "", "مفك عاده", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["35", "2025-06-07", "", "مفك صليبه", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["35", "2025-06-07", "", "بنسه بوز", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["516", "30/11/2025", "", "طقم بلدى /مشرشر", "عدد", 4, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["516", "30/11/2025", "", "مفتاح النكيه 4مم", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["516", "30/11/2025", "", "مفتاح النكيه 5مم", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["516", "30/11/2025", "", "مفتاح النكيه 6مم", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["516", "30/11/2025", "", "مفتاح النكيه 10مم", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["516", "30/11/2025", "", "طقم النكيه", "عدد", 3, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["516", "30/11/2025", "", "مفتاح فرنساوى 30مم", "عدد", 3, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["516", "30/11/2025", "", "مفتاح بيبه 10 مم", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["516", "30/11/2025", "", "مفتاح بيبه 17 مم", "عدد", 2, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["516", "30/11/2025", "", "مفتاح بيبه 19 مم", "عدد", 2, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["516", "30/11/2025", "", "مفتاح بيبه 12 مم", "عدد", 2, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["516", "30/11/2025", "", "مفتاح بيبه 8 مم", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["517", "30/11/2025", "", "مفتاح فلاتر شريط 4 \"", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["517", "30/11/2025", "", "مفتاح بوجيهات تايوانى", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["517", "30/11/2025", "", "مفتاح 36 جانب بلدى/ مشرشر", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["517", "30/11/2025", "", "طقم مفتاح لقمه", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["517", "30/11/2025", "", "مفتاح انجليزى 18\"", "عدد", 2, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["517", "30/11/2025", "", "مفتاح انجليزى 14\"", "عدد", 2, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["517", "30/11/2025", "", "لقمه ربط ماكيتا 24 مم", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["517", "30/11/2025", "", "لقمه ربط ماكيتا 27 مم", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["517", "30/11/2025", "", "طقم لقمه 1/2 مسدس", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["517", "30/11/2025", "", "طقم لقمه 1/4 مسدس", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["517", "30/11/2025", "", "مفك عاده", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["517", "30/11/2025", "", "مفك صليبه", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["517", "30/11/2025", "", "طقم مفك لقمه", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["518", "30/11/2025", "", "طفم مبرد", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["518", "30/11/2025", "", "مطرقه ربع كجم", "عدد", 2, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["518", "30/11/2025", "", "مطرقه 1كجم", "عدد", 3, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["518", "30/11/2025", "", "مفتاح انجليزى 18\"", "عدد", 2, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["518", "30/11/2025", "", "اجنه مبطط", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["518", "30/11/2025", "", "قصافه كهرباء", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["518", "30/11/2025", "", "بنسه كلابه", "عدد", 2, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["518", "30/11/2025", "", "طقم النكيه", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["518", "30/11/2025", "", "لقمه 3/4", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["518", "30/11/2025", "", "يد مفتاح 3/4", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["518", "30/11/2025", "", "بنسه بوز 8مم", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["518", "30/11/2025", "", "زاويه  علام 90", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["518", "30/11/2025", "", "طقم النكيه 9قطع", "عدد", 2, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["519", "30/11/2025", "", "مفتاح سوسته", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["519", "30/11/2025", "", "طقم لقمه", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["519", "30/11/2025", "", "عتله حديد", "عدد", 2, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["519", "2025-11-30", "LH.41.36.26.23.67.05.00.000001", "منجله", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["519", "30/11/2025", "LH.41.36.26.23.71.01.08.T00001", "مشحمخ يدوى 8كجم", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["519", "30/11/2025", "LH.41.36.26.23.71.03.12.T00001", "مشحمه هواء 12", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["519", "30/11/2025", "", "مفتاح عجل افيكو", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["519", "30/11/2025", "", "طقم مفك لقمه", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["519", "30/11/2025", "", "مفتاح بلدى", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["519", "30/11/2025", "", "مفتاح فرنساوى 18", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["519", "30/11/2025", "", "مطرقه 2كجم", "عدد", 2, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["519", "30/11/2025", "LH.41.36.26.23.18.14.04.000001", "قفل واير 4 طن", "عدد", 2, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["520", "30/11/2025", "", "طقم النكيه", "عدد", 2, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["520", "30/11/2025", "", "لافيه رفغ", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["520", "30/11/2025", "", "مقناح 10/ 11", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["520", "30/11/2025", "", "وصله بلف عجل", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["520", "30/11/2025", "", "لاكور تزويد عجل", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["795", "2025-01-10", "", "مفتاح بلدى 8/9", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["795", "2025-01-10", "", "مفتاح بلدى 12/13", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["795", "2025-01-10", "", "مفتاح بلدى مشرشر / عدل 24مم", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["795", "2025-01-10", "", "مفتاح فلاتر قماش", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["912", "26/8/2025", "", "مشحمه 12", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["514", "30/11/2025", "", "مفتاح بلدى  6/7", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["514", "30/11/2025", "", "طقم مفتاح بلدى 12 قطعه", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["514", "30/11/2025", "", "مفتاح بلدى 20/22", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["514", "30/11/2025", "", "مفتاح بلدى 24/27", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["514", "30/11/2025", "", "مفتاح بلدى 27/32", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["514", "30/11/2025", "", "مفتاح بلدى 9/8", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["514", "30/11/2025", "", "مفتاح بلدى 13/12", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["514", "30/11/2025", "", "مفتاح بلدى 15/14", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["514", "30/11/2025", "", "مفتاح بلدى 17/16", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["514", "30/11/2025", "", "مفتاح بلدى 22/19", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["514", "30/11/2025", "", "مفتاح بلدى 23/21", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["514", "30/11/2025", "", "مفتاح بلدى 26/24", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["514", "30/11/2025", "", "مفتاح بلدى 28/25", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["515", "30/11/2025", "", "مفتاح بلدى 36/41", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["515", "30/11/2025", "", "طقم مفتاح بلدى 12 قطعه", "عدد", 3, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["515", "30/11/2025", "", "مفتاح بلدى 6قطع", "عدد", 2, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["515", "30/11/2025", "", "مفتاح 41 بلدى مشرشر", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["515", "30/11/2025", "", "طقم مفاكات", "عدد", 2, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["515", "30/11/2025", "", "طقم النكيه عاده", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["515", "30/11/2025", "", "مفتاح فلاتر قماش", "عدد", 2, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["515", "30/11/2025", "", "مفتاح فرنساوى", "عدد", 2, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["515", "30/11/2025", "", "مفتاح بلدى /مشرشر 24", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["515", "30/11/2025", "", "مفتاح بلدى /مشرشر 36", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["515", "30/11/2025", "", "مفتاح بلدى /مشرشر 41", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["515", "30/11/2025", "", "مفتاح بلدى /مشرشر 46", "عدد", 2, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["515", "30/11/2025", "", "طقم لقمه 1/2مشرشر", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["933", "2026-02-15", "", "مفتاح 30 بلدى /مشرشر", "عدد", 4, "محمد محمود السيد", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["933", "2026-02-15", "", "مفك عاده", "عدد", 6, "محمد محمود السيد", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["933", "2026-02-15", "", "مفك صليبه", "عدد", 6, "محمد محمود السيد", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["933", "2026-02-15", "", "مفتاح 55 دق مشرشر", "عدد", 2, "عمرو عادل إبراهيم", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["933", "2026-02-15", "", "مفتاح 55 دق عادى", "عدد", 1, "عمرو عادل إبراهيم", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["933", "2026-02-15", "", "مفتاح 50 دق مشرشر", "عدد", 2, "عمرو عادل إبراهيم", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["933", "2026-02-15", "", "مفتاح 46 دق مشرشر", "عدد", 2, "عمرو عادل إبراهيم", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["933", "2026-02-15", "", "مفتاح 41 دق مشرشر", "عدد", 2, "محمد حسن علي", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["933", "2026-02-15", "", "مفتاح 36 دق مشرشر", "عدد", 4, "محمد حسن علي", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["933", "2026-02-15", "", "عتله صلب", "عدد", 2, "محمد حسن علي", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["933", "2026-02-15", "", "عتله صلب", "عدد", 1, "محمد حسن علي", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["933", "2026-02-15", "", "مفتاح انجليزى 36", "عدد", 1, "محمد حسن علي", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["933", "2026-02-15", "", "كلابه", "عدد", 1, "محمد حسن علي", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["932", "2026-02-15", "", "مفتاح 80 دق عاده", "عدد", 2, "محمد محمود السيد", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["932", "2026-02-15", "", "مفتاح 60 دق عاده", "عدد", 2, "محمد محمود السيد", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["932", "2026-02-15", "", "مفتاح 60 دق مشرشر", "عدد", 4, "محمد محمود السيد", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["932", "2026-02-15", "", "مفتاح 36 بلدى مشرشر", "عدد", 6, "محمد محمود السيد", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["932", "2026-02-15", "", "مفتاح 46 بلدى مشرشر", "عدد", 2, "عمرو عادل إبراهيم", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["932", "2026-02-15", "", "مفتاح 41 بلدى مشرشر", "عدد", 4, "عمرو عادل إبراهيم", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["932", "2026-02-15", "", "مفتاح 38 بلدى مشرشر", "عدد", 1, "عمرو عادل إبراهيم", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["932", "2026-02-15", "", "مفتاح 32 بلدى مشرشر", "عدد", 2, "عمرو عادل إبراهيم", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["932", "2026-02-15", "", "مفتاح 27 بلدى مشرشر", "عدد", 1, "عمرو عادل إبراهيم", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["932", "2026-02-15", "", "مفتاح انجليزى 24", "عدد", 2, "محمد حسن علي", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["932", "2026-02-15", "", "مفتاح انجليزى 18\"", "عدد", 4, "محمد حسن علي", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["932", "2026-02-15", "", "مفتاح فرنساوى 18", "عدد", 1, "محمد حسن علي", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["932", "2026-02-15", "", "مفتاح فرنساوى 12", "عدد", 3, "محمد حسن علي", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["932", "2026-02-15", "", "مفتاح 24 بلدى مشرشر", "عدد", 5, "محمد حسن علي", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["934", "2026-02-15", "", "مطرقه 5كجم", "عدد", 2, "محمد محمود السيد", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["934", "2026-02-15", "", "مفتاح  22 بلدى مشرشر", "عدد", 1, "محمد محمود السيد", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["934", "2026-02-15", "", "مفتاح  10 بلدى مشرشر", "عدد", 2, "عمرو عادل إبراهيم", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["934", "2026-02-15", "", "مفتاح  13 بلدى مشرشر", "عدد", 1, "عمرو عادل إبراهيم", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["934", "2026-02-15", "", "مفتاح  17 بلدى مشرشر", "عدد", 2, "مدحت محمد محمد", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["934", "2026-02-15", "", "مفتاح  14 بلدى مشرشر", "عدد", 1, "مدحت محمد محمد", "", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["499", "2026-05-02", "", "بروه صلب", "عدد", 1, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["603", "2026-07-01", "", "واير قماش 10 طن * 12متر", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "ارتجاع", "2026-11-03", "ونش خميس", "", ""],
+        ["606", "2026-07-05", "LH.41.36.26.23.50.02.01.000004", "مقص كابلات صغير الأصفر", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["610", "2026-07-05", "", "مطرقة 2كجم بيد خشب", "عدد", 1, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["613", "2026-07-08", "LP.41.36.26.16.05.02.50.T00003", "هيلتي احمر TE800", "عدد", 1, "محمد احمد عبد الهادي البدري", "مشرف تنفيذ", "10211562", "1007780428", "مستمرة", "", "العدل", "", ""],
+        ["335", "2026-04-06", "", "مطرقة", "عدد", 3, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["335", "2026-04-06", "", "اجنه مبطط", "عدد", 3, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["335", "2026-04-06", "", "مسمار تكسير", "عدد", 3, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["335", "2026-04-06", "", "طقم الانكية عادة", "عدد", 3, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "تكهين 1", "", ""],
+        ["335", "2026-04-06", "", "مفك صليبة", "عدد", 3, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["335", "2026-04-06", "", "مفتاح فرنساوي صغير", "عدد", 1, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["335", "2026-04-06", "", "مفتاح فرنساوي صغير", "عدد", 2, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["335", "2026-04-06", "", "ميزان مياه 60سم", "عدد", 3, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["335", "2026-04-06", "", "ضفرة", "عدد", 3, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["335", "2026-04-06", "", "مفتاح بلدي مشرشر 32", "عدد", 1, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["335", "2026-04-06", "", "مفتاح بلدي مشرشر 32", "عدد", 1, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["335", "2026-04-06", "", "مفتاح بلدي مشرشر 13", "عدد", 2, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["335", "2026-04-06", "", "مفتاح بلدي مشرشر 14", "عدد", 2, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["336", "2026-04-28", "", "مفتاح بلدي مشرشر 10", "عدد", 2, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["336", "2026-04-28", "", "مفتاح بلدي مشرشر 19", "عدد", 2, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["336", "2026-04-28", "", "مفتاح بلدي مشرشر 24", "عدد", 2, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["336", "2026-04-28", "", "مفتاح بلدي مشرشر 17", "عدد", 2, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["336", "2026-04-28", "", "مفتاح بلدي مشرشر 20", "عدد", 2, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["336", "2026-04-28", "", "مفتاح بلدي مشرشر 22", "عدد", 2, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["336", "2026-04-28", "", "مفتاح بلدي مشرشر 13", "عدد", 2, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["336", "2026-04-28", "", "مفك صليبة", "عدد", 2, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["336", "2026-04-28", "", "مفتاح فرنساوي كبير", "عدد", 1, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["336", "2026-04-28", "", "مفتاح فرنساوي كبير", "عدد", 2, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["336", "2026-04-28", "", "طقم مفتاح بلدي من 8 إلى 30", "عدد", 1, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["336", "2026-04-28", "", "طقم مفتاح نجمة", "عدد", 1, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["336", "2026-04-28", "", "مفك صليبة", "عدد", 4, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["288", "2026-03-09", "", "مكبس كابلات", "عدد", 1, "وليد اسامه حسن", "تركيبات", "", "", "مستمرة", "", "", "", "مراجعه"],
+        ["364", "2026-04-13", "LH.41.36.26.56.19.08.00.000001", "مسدس طلقات", "عدد", 2, "م احمد عوض", "", "", "", "مستمرة", "", "احمد ربيع", "", ""],
+        ["364", "2026-04-13", "", "ماتور 1 حصان", "عدد", 1, "م احمد عوض", "تشطيبات", "", "", "مستمرة", "", "احمد ربيع", "", ""],
+        ["364", "2026-04-13", "", "حزام امان", "عدد", 10, "م احمد عوض", "تشطيبات", "", "", "مستمرة", "", "احمد ربيع", "", ""],
+        ["309", "2026-03-24", "LP.41.36.26.16.24.01.25.000001", "صاروخ 9 بوصة", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["398", "2026-04-20", "", "كوبوتا مياه", "عدد", 1, "م محمد عبدالقادر", "تشطيبات", "", "", "مستمرة", "", "", "", ""],
+        ["926", "2025-08-31", "", "عتله صلب", "عدد", 1, "حموده شعبان", "نجار", "", "", "مستمرة", "", "", "", ""],
+        ["620", "2026-07-18", "", "مفتاح بلدي مشرشر 14", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["215", "2026-07-19", "", "مقص بولي", "عدد", 1, "ممدوح السعيد", "", "", "", "مستمرة", "", "", "", ""],
+        ["215", "2026-07-19", "", "مفتاح انجليزي 24 بوصة", "عدد", 1, "ممدوح السعيد", "", "", "", "مستمرة", "", "", "", ""],
+        ["215", "2026-07-19", "", "مفتاح فرنساوي", "عدد", 1, "ممدوح السعيد", "", "", "", "مستمرة", "", "", "", ""],
+        ["215", "2026-07-19", "", "بنسة كلابة", "عدد", 1, "ممدوح السعيد", "", "", "", "مستمرة", "", "", "", ""],
+        ["215", "2026-07-19", "", "بنسة جاز", "عدد", 1, "ممدوح السعيد", "", "", "", "مستمرة", "", "", "", ""],
+        ["215", "2026-07-19", "", "مطرقة 2 ك", "عدد", 1, "ممدوح السعيد", "", "", "", "مستمرة", "", "", "", ""],
+        ["621", "2026-07-19", "LH.41.36.26.23.18.14.10.T00001", "قفل واير 6طن", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "ارتجاع", "2026-11-03", "ونش خميس", "", ""],
+        ["621", "2026-07-19", "LH.11.01.10.16.78.10.00.T00001", "قفل صباني 10 طن", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "ارتجاع", "2026-11-03", "ونش خميس", "", ""],
+        ["624", "2026-07-21", "LH.41.36.26.23.18.05.03.000008", "واير جنزير سلسله رباعى 10 طن 10 متر", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "ارتجاع", "2026-11-03", "ونش خميس", "", "باقي امضاء المستلم"],
+        ["628", "2026-07-22", "", "كولمان مياه 45 لتر", "عدد", 2, "م اسلام الشناوي", "مهندس تنفيذ", "10201838", "", "مستمرة", "", "", "", ""],
+        ["635", "2026-07-25", "", "مفك عاده", "عدد", 3, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["635", "2026-07-25", "", "مفك صليبة", "عدد", 1, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["636", "2026-07-25", "", "مروحة حائط 18 بوصة", "عدد", 1, "اسلام كحيله", "", "", "", "مستمرة", "", "", "", "لزوم الميز"],
+        ["636", "2026-07-25", "", "صاعق ناموس", "عدد", 1, "اسلام كحيله", "", "", "", "مستمرة", "", "", "", "لزوم الميز"],
+        ["636", "2026-07-25", "", "جهاز SCAN", "عدد", 1, "اسلام كحيله", "", "", "", "مستمرة", "", "", "", "لزوم الميز"],
+        ["637", "2026-07-25", "", "مفك صليبة", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", "اعتما م طه"],
+        ["639", "2026-07-26", "", "شعلة بوتجاز 2 عين", "عدد", 3, "محمد احمد صلاح", "", "", "", "مستمرة", "", "فيوتشر كيم بيلدنج", "", ""],
+        ["639", "2026-07-26", "", "انبوبه بوتجاز", "عدد", 3, "محمد احمد صلاح", "", "", "", "مستمرة", "", "فيوتشر كيم بيلدنج", "", ""],
+        ["644", "2026-08-01", "LH.41.36.26.82.43.32.22.000001", "كوبوتا مياه 3حصان", "عدد", 1, "ابراهيم خلف", "", "", "", "مستمرة", "", "احمد ممدوح", "", "مقطورة السولار"],
+        ["646", "2026-08-03", "LP.41.36.26.16.24.01.25.000001", "صاروخ 9 بوصة", "عدد", 1, "حموده شعبان", "", "", "", "مستمرة", "", "", "", ""],
+        ["647", "2026-08-03", "", "مفك عادة", "عدد", 4, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["647", "2026-08-03", "", "بنسة جاز", "عدد", 1, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["647", "2026-08-03", "", "مفتاح فرنساوي 12\"", "عدد", 1, "احمد سليمان", "", "10208576", "", "مستمرة", "", "", "", ""],
+        ["648", "2026-08-04", "", "كوريك باليد", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "", "", ""],
+        ["650", "2026-08-05", "", "مطرقة 1 ك", "عدد", 1, "سالمان محمد سالمان", "", "", "", "مستمرة", "", "", "", ""],
+        ["650", "2026-08-05", "", "اجنة حديد", "عدد", 1, "سالمان محمد سالمان", "", "", "", "مستمرة", "", "", "", ""],
+        ["651", "2026-08-05", "", "بنسة كهرباء", "عدد", 1, "محمد صابر محمود", "كهربائي", "", "", "ارتجاع", "2026-11-19", "", "", "اعتماد م طه"],
+        ["651", "2026-08-05", "", "مفك عادة", "عدد", 1, "محمد صابر محمود", "كهربائي", "", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["651", "2026-08-05", "", "مفك صليبة", "عدد", 1, "محمد صابر محمود", "كهربائي", "", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["651", "2026-08-05", "", "مفك روزتة عادة", "عدد", 1, "محمد صابر محمود", "كهربائي", "", "", "ارتجاع", "", "", "", "اعتماد م طه"],
+        ["651", "2026-08-05", "", "مفك روزتة صليبة", "عدد", 1, "محمد صابر محمود", "كهربائي", "", "", "ارتجاع", "2026-11-19", "", "", "اعتماد م طه"],
+        ["651", "2026-08-05", "", "افوميبتر", "عدد", 1, "محمد صابر محمود", "كهربائي", "", "", "ارتجاع", "2026-11-19", "", "", "اعتماد م طه"],
+        ["656", "2026-08-09", "", "شعلة بوتجاز 2 عين", "عدد", 1, "محمد احمد صلاح", "", "", "", "مستمرة", "", "فيوتشر كيم بيلدنج", "", ""],
+        ["656", "2026-08-09", "", "انبوبه بوتجاز", "عدد", 1, "محمد احمد صلاح", "", "", "", "مستمرة", "", "فيوتشر كيم بيلدنج", "", ""],
+        ["657", "2026-08-10", "", "مطرقة 1.5ك", "عدد", 1, "حسن محمد على", "ريس عمال", "", "", "مستمرة", "", "", "", ""],
+        ["658", "2026-08-10", "", "قروانة صاج", "عدد", 2, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "", "", ""],
+        ["658", "2026-08-10", "", "مسطرين", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "", "", ""],
+        ["659", "2026-08-10", "", "ميكرويف 42 لتر", "عدد", 1, "اسلام كحيله", "", "", "", "مستمرة", "", "", "", "خاص بمكتب عقيد عصام ( المالك )"],
+        ["660", "2026-08-11", "", "كوريك باليد", "عدد", 2, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "", "", ""],
+        ["661", "2026-08-11", "", "شعلة بوتجاز 3 عين", "عدد", 1, "عبدالشكور يوسف", "", "", "", "مستمرة", "", "اسعد سليمان", "", ""],
+        ["668", "2026-08-16", "", "سلم المونيوم 4م مزدوج", "عدد", 1, "احمد سليمان", "", "10208576", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["671", "2026-08-17", "", "بروة محاره", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "", "", ""],
+        ["676", "2026-08-18", "", "مطرقة 2 كجم", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "", "", ""],
+        ["676", "2026-08-18", "", "اجنة", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "", "", ""],
+        ["771", "2026-08-12", "", "مفتاح دق 36", "عدد", 1, "أكرم احمد ابو الحمد احمد مصطفي", "مهندس قطاع", "10201845", "1202000768", "مستمرة", "", "", "", ""],
+        ["771", "2026-08-12", "", "مفتاح دق 41", "عدد", 2, "أكرم احمد ابو الحمد احمد مصطفي", "مهندس قطاع", "10201845", "1202000768", "مستمرة", "", "", "", ""],
+        ["678", "2026-08-19", "", "انبوبه بوتجاز", "عدد", 1, "احمد سيد محمد ضاحي", "فرد امن", "", "", "مستمرة", "", "", "", ""],
+        ["678", "2026-08-19", "", "شعلة بوتجاز 3 عين", "عدد", 1, "احمد سيد محمد ضاحي", "فرد امن", "", "", "مستمرة", "", "", "", ""],
+        ["680", "2026-08-19", "", "كلامب امبير", "عدد", 1, "م - احمد الخامي", "مهندس جودة", "10209123", "", "مستمرة", "", "", "", ""],
+        ["682", "2026-08-23", "LP.41.65.16.01.99.01.05.T00001", "مولد هوندا احمر  بالمفتاح", "عدد", 1, "علي عادل أحمد محمد", "مهندس اول كهرباء", "10207841", "1064824014", "مستمرة", "", "", "", ""],
+        ["684", "2026-08-23", "LH.11.01.10.16.78.10.00.T00001", "قفل واير 10 طن", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "", "", ""],
+        ["685", "2026-08-24", "", "مفتاح الانكيه 8مم", "عدد", 1, "عمرو مصطفى حامد", "مشرف تركيبات", "", "", "ارتجاع", "2026-11-07", "", "", "ت/ 01064364302"],
+        ["686", "2026-08-24", "", "شاكوش 2 كجم", "عدد", 1, "احمد ابراهيم سعد جاب الله", "مشرف تنفيذ", "29501101805571", "", "ارتجاع", "2026-11-22", "", "", ""],
+        ["686", "2026-08-24", "", "مسمار اجنه", "عدد", 1, "احمد ابراهيم سعد جاب الله", "مشرف تنفيذ", "29501101805571", "", "ارتجاع", "2026-11-22", "", "", ""],
+        ["689", "2026-08-24", "", "شاكوش 2 كجم", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", ""],
+        ["698", "2026-08-25", "", "مفتاح دق 80", "عدد", 2, "عبد السلام حلمى عبد السلام الصقار", "", "10208979", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["698", "2026-08-25", "", "واير 2متر 4طن", "عدد", 2, "عبد السلام حلمى عبد السلام الصقار", "", "10208979", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["954", "2026-08-29", "LH.41.36.26.23.69.01.05.000001", "كوريك 3طن ازرق", "عدد", 1, "صلاح محمد عباس طنطاوى", "مشرف مكانيكا", "10204775", "1011013532", "مستمرة", "", "", "", ""],
+        ["957", "2026-08-30", "", "واير قماش 1.5 متر", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "", "", ""],
+        ["968", "2026-09-06", "", "انبوبه بوتجاز", "عدد", 1, "محمد احمد صلاح", "مقاول", "", "", "مستمرة", "", "فيوتشر كيم بيلدنج", "", ""],
+        ["968", "2026-09-06", "", "شعلة بوتجاز 2 عين", "عدد", 1, "محمد احمد صلاح", "مقاول", "", "", "مستمرة", "", "فيوتشر كيم بيلدنج", "", ""],
+        ["969", "2026-09-07", "", "واير قماش ازرق 8طن طول 10متر", "عدد", 1, "احمد ابراهيم سعد جاب الله", "مشرف تنفيذ", "29501101805571", "", "ارتجاع", "2026-11-22", "", "", ""],
+        ["970", "2026-09-07", "", "شاكوش 2 كجم", "عدد", 1, "م اسلام الشناوي", "مهندس تنفيذ", "10201838", "", "مستمرة", "", "", "", ""],
+        ["451", "2026-09-07", "LP.41.36.26.23.13.02.04.000024", "ماكينه لحام 220فولت شنطة", "عدد", 1, "احمد السيد عبدالعال", "لحام", "10002575", "", "مستمرة", "", "", "", ""],
+        ["451", "2026-09-07", "LP.41.36.26.16.24.01.25.000001", "صاروخ 9 بوصة", "عدد", 1, "احمد السيد عبدالعال", "لحام", "10002575", "", "مستمرة", "", "", "", ""],
+        ["451", "2026-09-07", "", "مفتاح النكيه6+8", "عدد", 2, "احمد السيد عبدالعال", "لحام", "10002575", "", "مستمرة", "", "", "", ""],
+        ["451", "2026-09-07", "", "عتله صلب 75سم", "عدد", 1, "احمد السيد عبدالعال", "لحام", "10002575", "", "مستمرة", "", "", "", ""],
+        ["453", "2026-09-07", "LP.41.36.26.23.42.45.00.000001", "منشار  شجر بنزيز", "عدد", 1, "رضا زاكي عبد الملاك سلامه", "مقاول", "27410061800714", "", "ارتجاع", "", "حورس", "", ""],
+        ["453", "2026-09-07", "", "واير قماش 10طن 8 متر", "عدد", 1, "رضا زاكي عبد الملاك سلامه", "مقاول", "27410061800714", "", "مستمرة", "", "حورس", "", ""],
+        ["459", "2026-09-09", "LP.41.65.16.01.99.01.05.T00001", "مولد هوندا احمر  بالمفتاح", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "ريفا", "", ""],
+        ["459", "2026-09-09", "", "سوستة تكريب 25مم", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "ريفا", "", ""],
+        ["460", "2026-09-14", "LP.41.36.26.16.07.01.15.000001", "بلاور هواء", "عدد", 1, "احمد عادل محمد على فوده", "مشرف تشطيبات", "", "", "مستمرة", "", "", "", ""],
+        ["463", "2026-09-14", "", "شريط قياس 5م", "عدد", 1, "عبدالسلام حلمي", "تركيبات", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["463", "2026-09-14", "", "مطرقة", "عدد", 1, "عبدالسلام حلمي", "تركيبات", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["463", "2026-09-14", "", "منشار خشابي", "عدد", 1, "عبدالسلام حلمي", "تركيبات", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["466", "2026-09-14", "", "مفتاح الانكيه 10مم", "عدد", 1, "عمرو مصطفى حامد", "تركيبات", "", "", "ارتجاع", "2026-11-07", "", "", ""],
+        ["480", "2026-09-16", "", "مفتاح بلدي مشرشر36مم", "عدد", 2, "عبدالسلام حلمي", "تركيبات", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["481", "2026-09-17", "LP.41.36.26.16.05.04.10.T00001", "هيلتي احمر TE50", "عدد", 1, "محمد عمران على عمران", "مشرف تنفيذ", "10205729", "1099803594", "ارتجاع", "2026-10-31", "العدل", "", ""],
+        ["482", "2026-09-17", "", "لقمة ماكينة لحام بولي 32مم", "عدد", 1, "علي عادل أحمد محمد", "مهندس اول كهرباء", "10207841", "1064824014", "مستمرة", "", "", "", ""],
+        ["485", "2026-09-18", "", "افوميبتر ديجيتال - كلامب", "عدد", 1, "شعبان سعيد عبد القوي", "مشرف كهربائي", "", "", "مستمرة", "", "", "", ""],
+        ["467", "2026-09-18", "", "طفاية حريق 6كجم بودره", "عدد", 1, "عبد الناصر عبد التواب", "", "", "", "مستمرة", "", "الفهود", "", ""],
+        ["487", "2026-09-22", "", "مفتاح بلدي مشرشر19مم", "عدد", 2, "م طه علي", "م كهرباء", "", "", "ارتجاع", "2026-11-08", "", "", ""],
+        ["495", "2026-09-26", "", "كوريك باليد", "عدد", 1, "محمد صابر محمود", "مشرف كهربائي", "", "", "ارتجاع", "2026-11-19", "", "", ""],
+        ["500", "2026-09-26", "", "شاكوش نجارة", "عدد", 1, "م اسلام الشناوي", "مهندس تنفيذ", "10201838", "", "مستمرة", "", "", "", ""],
+        ["972", "2026-09-28", "", "تانك مياة مريع 1م3", "عدد", 1, "احمد السيد عبدالعال", "لحام", "10002575", "", "مستمرة", "", "", "", ""],
+        ["974", "2026-09-30", "LP.41.36.26.23.13.02.04.000026", "شنيور 13مم", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "2026-11-03", "مقاول ريفا", "", ""],
+        ["974", "2026-09-30", "LP.41.36.26.16.10.11.12.T00001", "هيلتي شنيور ديوليت اصفر26", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", ""],
+        ["974", "2026-09-30", "LP.41.36.26.16.24.01.25.000001", "صاروخ 9 بوصة", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "2026-11-18", "", "", "مراجعه"],
+        ["975", "2026-10-01", "", "طفاية حريق 6كجم بودره", "عدد", 1, "محمود صبحي محمد", "فني تركيبات", "", "", "مستمرة", "", "", "65213", ""],
+        ["977", "2026-10-05", "", "تانك مياة مريع 1م3", "عدد", 1, "يوسف سليمان", "", "", "", "مستمرة", "", "اسعد سليمان", "", ""],
+        ["978", "2026-10-05", "LP.41.65.16.01.99.01.05.T00001", "مولد هوندا احمر بالمفتاح", "عدد", 1, "علي عادل أحمد محمد", "مهندس اول كهرباء", "10207841", "1064824014", "ارتجاع", "2026-10-30", "", "", ""],
+        ["983", "2026-10-07", "LP.41.36.26.16.10.11.12.T00001", "هيلتي شنيور ديوليت اصفر26", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "2026-10-08", "", "", ""],
+        ["983", "2026-10-07", "", "مفتاح 19", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", ""],
+        ["986", "2026-10-11", "", "ميزان مياه 1 م", "عدد", 1, "احمد عادل محمد على فوده", "مشرف تشطيبات", "", "", "مستمرة", "", "", "", ""],
+        ["986", "2026-10-11", "", "بروه صلب", "عدد", 1, "احمد عادل محمد على فوده", "مشرف تشطيبات", "", "", "مستمرة", "", "", "", ""],
+        ["986", "2026-10-11", "LP.41.36.26.16.12.01.09.T00002", "صاروخ 9 بوصة", "عدد", 1, "احمد عادل محمد على فوده", "مشرف تشطيبات", "", "", "مستمرة", "", "", "", ""],
+        ["986", "2026-10-11", "", "مطرقة حديد 2 ك", "عدد", 1, "احمد عادل محمد على فوده", "مشرف تشطيبات", "", "", "مستمرة", "", "", "", ""],
+        ["987", "2026-10-11", "", "طقم الانكية عادة", "عدد", 1, "ممدوح السعيد", "", "", "", "مستمرة", "", "", "", ""],
+        ["988", "2026-10-11", "LC.41.36.26.23.85.04.00.T00002", "منظم اكسجين محلى", "EA", 1, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["988", "2026-10-11", "LH.01.52.13.01.05.00.00.T00001", "ترابيزة غيار 60*40", "EA", 1, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["988", "2026-10-11", "LH.01.52.16.02.14.21.00.000001", "سرير شيزلونج", "EA", 3, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["988", "2026-10-11", "LH.01.52.16.02.55.05.01.T00001", "جهاز قياس نبض (Pulse oximeter)", "EA", 1, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["988", "2026-10-11", "LH.01.52.16.13.80.50.00.000001", "دولاب للادوية", "EA", 1, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["988", "2026-10-11", "LH.10.40.99.01.00.00.00.000001", "Ambulance Bag", "EA", 1, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["988", "2026-10-11", "LH.11.72.13.01.00.00.00.000001", "Stethoscope", "EA", 2, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["988", "2026-10-11", "LH.11.72.13.05.00.02.00.000001", "جهاز قياس نسبة الاكسجين", "EA", 1, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["988", "2026-10-11", "LH.11.72.13.05.05.00.00.T00001", "Manual Blood-Pressure Meters", "EA", 1, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["988", "2026-10-11", "LH.11.72.13.05.10.00.00.T00001", "Digital Blood-Pressure Meters", "EA", 1, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["988", "2026-10-11", "LH.11.72.13.05.11.00.00.000001", "جهاز ضغط زئبقي", "EA", 1, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["988", "2026-10-11", "LH.11.72.13.07.02.01.00.000001", "جهاز قياس سكر عشوائي و شرائطة", "EA", 2, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["989", "2026-10-11", "LH.11.72.13.13.01.00.00.T00001", "حامل محاليل 4شعبة", "EA", 1, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["989", "2026-10-11", "LH.11.72.13.17.01.00.00.000001", "THERMOMETER MANUAL", "EA", 1, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["989", "2026-10-11", "LH.11.72.53.11.01.01.00.000001", "نقالة لحمل المصابين -قابلة للطي", "EA", 3, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["989", "2026-10-11", "LH.41.36.26.23.61.58.01.T00001", "Dry Film Thickness (DFT) -Painting gauge", "EA", 1, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["989", "2026-10-11", "LH.41.36.26.23.75.03.00.T00001", "اسطوانه اكسجين صناعي", "EA", 2, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["989", "2026-10-11", "LP.11.72.13.54.14.00.00.T00001", "جهاز مونيتور ميدي تك", "EA", 1, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["989", "2026-10-11", "LP.11.72.13.54.15.12.00.T00001", "جهاز صدمات كهربائية صيني", "EA", 1, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["989", "2026-10-11", "LP.11.72.13.54.16.19.00.T00001", "جهاز نيبولايزر ايطالي Granzia ) تنفس صناعى", "EA", 2, "محمود ياسين  عبد المنعم", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["994", "2026-10-12", "", "مكبس كابلات", "EA", 1, "علي عادل أحمد محمد", "مهندس اول كهرباء", "10207841", "1064824014", "مستمرة", "", "", "", ""],
+        ["996", "2026-10-14", "LP.41.36.26.16.10.01.05.T00001", "هيلتى 45 مم بوش أزرق", "عدد", 1, "احمد السيد عبدالعال", "", "", "", "ارتجاع", "2026-10-31", "", "", ""],
+        ["996", "2026-10-14", "", "مفتاح بلدي مشرشر 24", "عدد", 1, "احمد السيد عبدالعال", "", "", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["996", "2026-10-14", "", "شاكوش نجارة", "عدد", 1, "احمد السيد عبدالعال", "", "", "", "ارتجاع", "2026-10-31", "", "", ""],
+        ["999", "2026-10-15", "", "مقص حديد كهرباء", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "اسعد سليمان", "", ""],
+        ["999", "2026-10-15", "", "واير صلب 2 م", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "اسعد سليمان", "", ""],
+        ["999", "2026-10-15", "", "قفل صلب", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "ارتجاع", "2026-11-03", "اسعد سليمان", "", ""],
+        ["1000", "2026-10-17", "", "مرزبة 10 ك", "عدد", 1, "احمد السيد عبدالعال", "", "", "", "ارتجاع", "2026-10-31", "", "", ""],
+        ["1000", "2026-10-17", "", "عتله حديد 1م", "عدد", 1, "احمد السيد عبدالعال", "", "", "", "ارتجاع", "2026-10-31", "", "", ""],
+        ["1000", "2026-10-17", "", "ميزان مياه 40 سم", "عدد", 1, "احمد السيد عبدالعال", "", "", "", "ارتجاع", "2026-10-31", "", "", ""],
+        ["101", "2026-10-17", "LP.41.65.16.01.99.01.05.T00001", "مولد هوندا احمر بالمفتاح", "عدد", 1, "محمد احمد عبد الهادي البدري", "مشرف تنفيذ", "10211562", "1007780428", "ارتجاع", "2026-11-23", "العدل", "", ""],
+        ["102", "2026-10-18", "", "دكاك تربة ازرق جديد", "عدد", 1, "م اسلام الشناوي", "مهندس تنفيذ", "10201838", "", "مستمرة", "", "", "2172188", ""],
+        ["103", "2026-10-18", "LP.41.36.26.16.05.02.50.T00003", "هيلتي احمر TE800", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "2026-11-03", "ريفا", "", ""],
+        ["104", "2026-10-18", "", "طقم قلاوظ", "عدد", 2, "م - خالد جاد الله", "", "", "", "ارتجاع", "2026-10-30", "", "", ""],
+        ["109", "2026-10-18", "LH.41.36.26.23.01.45.00.000003", "مفتاح بوجيهات تايوانى", "عدد", 1, "صلاح محمد عباس طنطاوى", "", "", "", "مستمرة", "", "", "", ""],
+        ["110", "2026-10-19", "LH.41.36.26.23.02.01.00.T00041", "لقمة 24", "عدد", 1, "احمد السيد عبدالعال", "", "", "", "ارتجاع", "2026-10-31", "", "", ""],
+        ["111", "2026-10-19", "LP.41.36.26.16.52.34.01.T00001", "هيلتي 40 مم بوش أزرق", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", ""],
+        ["111", "2026-10-19", "", "بونطة تكسير", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "", "", "", ""],
+        ["114", "2026-10-21", "41.36.55.55.45.56.00.000001", "دكاك تربة ازرق جديد", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "", "2184410", ""],
+        ["115", "2026-10-21", "LH.41.36.26.23.69.03.00.000001", "كوريد باليد", "عدد", 1, "وائل عبد العليم", "كهرباء", "", "", "مستمرة", "", "", "", ""],
+        ["116", "2026-10-21", "LP.41.36.26.16.12.01.09.T00002", "صاروخ 9 بوصة", "عدد", 1, "احمد عادل محمد على فوده", "مشرف تشطيبات", "", "", "مستمرة", "", "فيوتشر كيم بيلدنج", "", ""],
+        ["117", "2026-10-22", "LP.41.65.16.01.99.01.05.T00001", "مولد هوندا احمر  بالمفتاح", "عدد", 1, "ريفا", "", "", "", "ارتجاع", "", "ريفا", "", ""],
+        ["118", "2026-10-22", "", "عاكس بريزم جديد", "عدد", 3, "رافت محمد مبروك متولي", "شيف مساحه", "10088060", "", "مستمرة", "", "", "", ""],
+        ["118", "2026-10-22", "", "شاحن توتال", "عدد", 1, "رافت محمد مبروك متولي", "شيف مساحه", "10088060", "", "مستمرة", "", "", "", ""],
+        ["118", "2026-10-22", "", "بطارية توتال", "عدد", 1, "رافت محمد مبروك متولي", "شيف مساحه", "10088060", "", "مستمرة", "", "", "", ""],
+        ["119", "2026-10-23", "", "ميزان مياه", "عدد", 1, "احمد ابراهيم سعد جاب الله", "مشرف تنفيذ", "29501101805571", "", "ارتجاع", "2026-11-19", "", "", ""],
+        ["920", "2026-10-14", "LP.41.36.26.16.10.01.05.T00001", "هيلتي 45 مم بوش أزرق", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "ارتجاع", "2026-10-15", "", "", ""],
+        ["920", "2026-10-14", "LH.41.36.26.23.69.03.00.000001", "كوريك", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "", "", ""],
+        ["122", "2026-10-24", "", "مفتاح بلدي مشرشر 24", "عدد", 1, "احمد السيد عبدالعال", "", "", "", "ارتجاع", "2026-10-31", "", "", ""],
+        ["122", "2026-10-24", "", "مفتاح بلدي 24/27", "عدد", 1, "احمد السيد عبدالعال", "", "", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["123", "2026-10-25", "LP.41.36.26.16.05.02.50.T00003", "هيلتي احمر TE800", "عدد", 1, "محمد احمد عبد الهادي البدري", "مشرف تنفيذ", "10211562", "1007780428", "مستمرة", "", "", "", ""],
+        ["126", "2026-10-25", "LP.41.36.26.16.05.02.50.T00003", "هيلتي احمر TE800", "عدد", 1, "رافت جمال عبد الفتاح", "مشرف تشطيبات", "", "", "ارتجاع", "2026-10-27", "العدل", "", ""],
+        ["127", "2026-10-26", "", "هيليكوبتر خرسانة 120سم", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "اسعد سليمان", "1028862", ""],
+        ["127", "2026-10-26", "", "هيليكوبتر خرسانة 120سم", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "اسعد سليمان", "1117034", ""],
+        ["128", "2026-10-26", "", "كشاف ليد 200 وات", "عدد", 2, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "", "1117034", ""],
+        ["129", "2026-10-28", "", "مفتاح 30 بلدى /مشرشر", "عدد", 4, "جلال بدوي احمد", "فني تشغيل", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["129", "2026-10-28", "", "مفك عاده", "عدد", 6, "جلال بدوي احمد", "فني تشغيل", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["129", "2026-10-28", "", "مفك صليبه", "عدد", 6, "جلال بدوي احمد", "فني تشغيل", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["129", "2026-10-28", "", "مفتاح 80 دق عاده", "عدد", 2, "جلال بدوي احمد", "فني تشغيل", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["129", "2026-10-28", "", "مفتاح 60 دق عاده", "عدد", 2, "جلال بدوي احمد", "فني تشغيل", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["129", "2026-10-28", "", "مفتاح 60 دق مشرشر", "عدد", 4, "جلال بدوي احمد", "فني تشغيل", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["129", "2026-10-28", "", "مفتاح 36 بلدى مشرشر", "عدد", 6, "جلال بدوي احمد", "فني تشغيل", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["129", "2026-10-28", "", "مطرقه 5كجم", "عدد", 2, "جلال بدوي احمد", "فني تشغيل", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["129", "2026-10-28", "", "مفتاح  22 بلدى مشرشر", "عدد", 1, "جلال بدوي احمد", "فني تشغيل", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["129", "2026-10-28", "", "عتله صلب", "عدد", 2, "جلال بدوي احمد", "فني تشغيل", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["129", "2026-10-28", "", "طقم مفك عاده", "عدد", 1, "جلال بدوي احمد", "فني تشغيل", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["129", "2026-10-28", "", "طقم مفك صليبه", "عدد", 1, "جلال بدوي احمد", "فني تشغيل", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["130", "2026-10-28", "", "مفتاح انجليزى 18\"", "عدد", 1, "جلال بدوي احمد", "فني تشغيل", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["130", "2026-10-28", "", "مفتاح  17 بلدى مشرشر", "عدد", 2, "جلال بدوي احمد", "فني تشغيل", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["130", "2026-10-28", "", "مفتاح  14 بلدى مشرشر", "عدد", 1, "جلال بدوي احمد", "فني تشغيل", "", "", "ارتجاع", "2026-11-15", "", "", "اعتماد م اسلام الشناوي"],
+        ["134", "2026-10-31", "LP.41.36.26.16.10.01.05.T00001", "هيلتي 45 مم بوش أزرق", "عدد", 1, "محمد عمران على عمران", "مشرف تنفيذ", "10205729", "1099803594", "مستمرة", "", "العدل", "", ""],
+        ["135", "2026-10-31", "", "مقتاح  فرنساوي 10 بوصة", "عدد", 1, "مصطفى عزام", "ممرض", "", "", "مستمرة", "", "", "", ""],
+        ["136", "2026-11-01", "", "كلبس SK", "عدد", 30, "محمد عبد القادر", "تشطيبات", "10204598", "", "مستمرة", "", "", "", ""],
+        ["137", "2026-11-02", "", "اجنة مسمار", "عدد", 1, "احمد السيد عبدالعال", "", "", "", "مستمرة", "", "", "", ""],
+        ["138", "2026-11-02", "LP.41.36.26.16.10.01.05.T00001", "هيلتي 45 مم بوش أزرق", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "2026-11-18", "", "", ""],
+        ["139", "2026-11-02", "", "مفتاح جنزير فلاتر", "عدد", 1, "ممدوح السعيد", "", "", "", "مستمرة", "", "", "", ""],
+        ["140", "2026-11-03", "LP.41.36.26.16.10.01.05.T00001", "هيلتي 45 مم بوش أزرق", "عدد", 1, "محمد عمران على عمران", "مشرف تنفيذ", "10205729", "1099803594", "مستمرة", "", "العدل", "", ""],
+        ["141", "2026-11-04", "", "موتور مياه 1.5 حصان", "عدد", 1, "م خالد جاد الله", "", "", "", "مستمرة", "", "", "", ""],
+        ["143", "2026-11-03", "", "مفتاح بلدي مشرشر 36", "عدد", 2, "أكرم احمد ابو الحمد احمد مصطفي", "مهندس قطاع", "10201845", "1202000768", "مستمرة", "", "حورس", "", ""],
+        ["145", "2026-11-09", "", "مفتاح بلدي 30.-32", "عدد", 2, "احمد صلاح", "", "", "", "ارتجاع", "2026-11-23", "اشتال", "", ""],
+        ["147", "2026-11-09", "", "شاكوش نجارة", "عدد", 1, "احمد السيد عبدالعال", "", "", "", "مستمرة", "", "", "", ""],
+        ["147", "2026-11-09", "", "مرزبة 5 ك", "عدد", 1, "احمد السيد عبدالعال", "", "", "", "ارتجاع", "2026-11-16", "", "", ""],
+        ["148", "2026-11-09", "", "شعلة حديد 3 عين", "عدد", 1, "فريد شوقي", "", "", "", "مستمرة", "", "ريفا", "", ""],
+        ["148", "2026-11-09", "", "انبوبه بوتجاز", "عدد", 1, "فريد شوقي", "", "", "", "مستمرة", "", "ريفا", "", ""],
+        ["149", "2026-11-09", "", "سلسلة جنزير رباعي", "عدد", 1, "م ايمن جاد", "", "", "", "مستمرة", "", "ونش خميس", "", ""],
+        ["149", "2026-11-09", "", "واير قماش 10م - 10 طن", "عدد", 1, "م ايمن جاد", "", "", "", "مستمرة", "", "ونش خميس", "", ""],
+        ["149", "2026-11-09", "", "قفل صباني 10 طن", "عدد", 2, "م ايمن جاد", "", "", "", "مستمرة", "", "ونش خميس", "", ""],
+        ["806", "2026-11-14", "", "ميزان مياه 60سم", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "", "ارتجاع", "2026-11-17", "", "", ""],
+        ["803", "2026-11-12", "LP.41.65.16.01.99.01.05.T00001", "مولد هوندا احمر  بالمفتاح", "عدد", 1, "احمد عادل محمد على فوده", "مشرف تشطيبات", "", "", "ارتجاع", "2026-11-23", "", "", ""],
+        ["807", "2026-11-15", "", "تناية حديد كهرباء", "عدد", 1, "احمد محمد السعداوى", "مهندس تنفيذ", "10208482", "", "مستمرة", "", "اسعد سليمان", "", ""],
+        ["155", "2026-11-16", "", "كشاف ليد 200 وات", "عدد", 2, "محمد احمد عبد الهادي البدري", "مشرف تنفيذ", "10211562", "1007780428", "مستمرة", "", "", "", ""],
+        ["808", "2026-11-15", "LP.41.65.16.01.99.01.05.T00001", "مولد هوندا احمر بالمفتاح", "عدد", 1, "فريد شوقي", "", "", "1096697228", "مستمرة", "", "ريفا", "", ""],
+        ["810", "2026-11-16", "", "مفتاح 80 دق مشرشر", "عدد", 1, "محمد عبد الهادي محمد", "", "", "1096697228", "مستمرة", "", "ايدن", "", ""],
+        ["810", "2026-11-16", "", "مفتاح 80 دق عادة", "عدد", 1, "محمد عبد الهادي محمد", "", "", "1096697228", "مستمرة", "", "ايدن", "", ""],
+        ["810", "2026-11-16", "", "مفتاح 60 دق عاده", "عدد", 2, "محمد عبد الهادي محمد", "", "", "1096697228", "مستمرة", "", "ايدن", "", ""],
+        ["810", "2026-11-16", "", "مفتاح 46 دق مشرشر", "عدد", 1, "محمد عبد الهادي محمد", "", "", "1096697228", "مستمرة", "", "ايدن", "", ""],
+        ["810", "2026-11-16", "", "مفتاح 46 بلدي مشرشر", "عدد", 1, "محمد عبد الهادي محمد", "", "", "1096697228", "مستمرة", "", "ايدن", "", ""],
+        ["810", "2026-11-16", "", "مفتاح 41 دق مشرشر", "عدد", 1, "محمد عبد الهادي محمد", "", "", "1096697228", "مستمرة", "", "ايدن", "", ""],
+        ["810", "2026-11-16", "", "مفتاح 41 بلدي مشرشر", "عدد", 1, "محمد عبد الهادي محمد", "", "", "1096697228", "مستمرة", "", "ايدن", "", ""],
+        ["810", "2026-11-16", "", "مفتاح 36 دق مشرشر", "عدد", 1, "محمد عبد الهادي محمد", "", "", "1096697228", "مستمرة", "", "ايدن", "", ""],
+        ["810", "2026-11-16", "", "مفتاح 36 بلدي مشرشر", "عدد", 1, "محمد عبد الهادي محمد", "", "", "1096697228", "مستمرة", "", "ايدن", "", ""],
+        ["810", "2026-11-16", "", "مطرقة 5 ك", "عدد", 1, "محمد عبد الهادي محمد", "", "", "1096697228", "مستمرة", "", "ايدن", "", ""],
+        ["810", "2026-11-16", "", "مفتاح انجليزى 18\"", "عدد", 2, "محمد عبد الهادي محمد", "", "", "1096697228", "مستمرة", "", "ايدن", "", ""],
+        ["811", "2026-11-16", "", "مفتاح فرنساوي 12\"", "عدد", 2, "محمد عبد الهادي محمد", "", "", "1096697228", "مستمرة", "", "ايدن", "", ""],
+        ["811", "2026-11-16", "", "مفتاح 30 بلدى مشرشر", "عدد", 4, "محمد عبد الهادي محمد", "", "", "1096697228", "مستمرة", "", "ايدن", "", ""],
+        ["811", "2026-11-16", "", "مفتاح 24 بلدى مشرشر", "عدد", 3, "محمد عبد الهادي محمد", "", "", "1096697228", "مستمرة", "", "ايدن", "", ""],
+        ["811", "2026-11-16", "", "مفتاح بلدي 24 - 27", "عدد", 1, "محمد عبد الهادي محمد", "", "", "1096697228", "مستمرة", "", "ايدن", "", ""],
+        ["811", "2026-11-16", "", "مفتاح الانكيه 10مم", "عدد", 1, "محمد عبد الهادي محمد", "", "", "1096697228", "مستمرة", "", "ايدن", "", ""],
+        ["811", "2026-11-16", "", "مفتاح الانكيه 12مم", "عدد", 1, "محمد عبد الهادي محمد", "", "", "1096697228", "مستمرة", "", "ايدن", "", ""],
+        ["811", "2026-11-16", "", "مفتاح 27 بلدى مشرشر", "عدد", 1, "محمد عبد الهادي محمد", "", "", "1096697228", "مستمرة", "", "ايدن", "", ""],
+        ["814", "2026-11-18", "", "كوريك", "عدد", 1, "احمد الهادى محمد محمد", "", "10006268", "1202637005", "مستمرة", "", "", "", ""],
+        ["159", "2026-11-21", "", "افوميتر", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "122288470", "مستمرة", "", "", "", ""],
+        ["159", "2026-11-21", "", "سوستة تكريب 25مم", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "122288470", "مستمرة", "", "", "", ""],
+        ["159", "2026-11-21", "", "بنسة", "عدد", 1, "محمد محمود ابوزيد حسين", "مشرف كهرباء", "10206309", "122288470", "مستمرة", "", "", "", ""]
+      ]
+    };
+
+    // =========================================================================
+    // 2. ARABIC TEXT NORMALIZATION & DURATION UTILITIES
+    // =========================================================================
+    function normalizeArabic(text) {
+      if (text === null || text === undefined) return "";
+      return String(text)
+        .trim()
+        .toLowerCase()
+        .replace(/[\u064B-\u065F\u0670]/g, "") // Remove Tashkeel
+        .replace(/[أإآٱ]/g, "ا")
+        .replace(/ة/g, "ه")
+        .replace(/ى/g, "ي")
+        .replace(/ؤ/g, "ء")
+        .replace(/ئ/g, "ء")
+        .replace(/\s+/g, " ");
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    // Calculate Arabic duration (Years, Months, Days) without zero parts
+    function calculateArabicDuration(startDateStr, endDateStr = null) {
+      if (!startDateStr) return "-";
+      const start = new Date(startDateStr);
+      if (isNaN(start.getTime())) return "-";
+
+      const end = endDateStr ? new Date(endDateStr) : new Date();
+      if (isNaN(end.getTime()) || end < start) return "0 يوم";
+
+      let years = end.getFullYear() - start.getFullYear();
+      let months = end.getMonth() - start.getMonth();
+      let days = end.getDate() - start.getDate();
+
+      if (days < 0) {
+        months -= 1;
+        const prevMonth = new Date(end.getFullYear(), end.getMonth(), 0);
+        days += prevMonth.getDate();
+      }
+      if (months < 0) {
+        years -= 1;
+        months += 12;
+      }
+
+      const parts = [];
+      if (years > 0) parts.push(`${years} سنة`);
+      if (months > 0) parts.push(`${months} شهر`);
+      if (days > 0) parts.push(`${days} يوم`);
+
+      return parts.length > 0 ? parts.join(" و ") : "اليوم";
+    }
+
+    // Format Egyptian mobile number (ensure leading 0 for 10-digit numbers starting with 1)
+    function formatEgyptianPhone(phoneVal) {
+      if (!phoneVal) return "";
+      const cleaned = String(phoneVal).replace(/\s+/g, "").trim();
+      if (/^1[0125]\d{8}$/.test(cleaned)) {
+        return "0" + cleaned;
+      }
+      return cleaned;
+    }
+
+    // =========================================================================
+    // 3. APPLICATION STATE & DATA HYDRATION
+    // =========================================================================
+    let state = {
+      staff: [],
+      custody: [],
+      searchScope: "all", // 'all' | 'person' | 'code' | 'item'
+      searchQuery: "",
+      selectedEntity: null, // { type: 'person'|'code'|'item', key: string, label: string, subLabel: string, empCode: string, phone: string, job: string }
+      statusFilter: "all", // 'all' | 'مستمرة' | 'ارتجاع'
+      visibleLimit: 60,
+      lastSyncTime: null,
+      isCloudConnected: false,
+      user: null
+    };
+
+    function isNumericCodeLike(val) {
+      const s = String(val || "").trim();
+      return s.length > 0 && /^\d+$/.test(s);
+    }
+
+    function hydrateData(rawStaff, rawCustody) {
+      const embeddedStaffByCode = new Map();
+      const embeddedStaffByName = new Map();
+      (INITIAL_DATA.s || []).forEach(r => {
+        const c = String(r[0] || "").trim();
+        const n = String(r[1] || "").trim();
+        const j = String(r[2] || "").trim();
+        const p = formatEgyptianPhone(r[3]);
+        if (c) embeddedStaffByCode.set(c, { code: c, nameAr: n, job: j, phone: p });
+        if (n) embeddedStaffByName.set(normalizeArabic(n), { code: c, nameAr: n, job: j, phone: p });
+      });
+
+      const staffMapByCode = new Map();
+      const staffMapByName = new Map();
+
+      const staffList = (rawStaff || []).map(row => {
+        const obj = Array.isArray(row)
+          ? {
+              code: String(row[0] || "").trim(),
+              nameAr: String(row[1] || "").trim(),
+              job: String(row[2] || "").trim(),
+              phone: formatEgyptianPhone(row[3]),
+              nationalId: String(row[4] || "").trim()
+            }
+          : { ...row, phone: formatEgyptianPhone(row.phone) };
+
+        if (isNumericCodeLike(obj.job)) {
+          if (!obj.code) obj.code = obj.job;
+          obj.job = "";
+        }
+
+        const fallback =
+          (obj.code && embeddedStaffByCode.get(obj.code)) ||
+          (obj.nameAr && embeddedStaffByName.get(normalizeArabic(obj.nameAr)));
+        if (fallback) {
+          if (!obj.job && fallback.job) obj.job = fallback.job;
+          if (!obj.phone && fallback.phone) obj.phone = fallback.phone;
+        }
+
+        if (obj.code) staffMapByCode.set(obj.code, obj);
+        if (obj.nameAr) staffMapByName.set(normalizeArabic(obj.nameAr), obj);
+        return obj;
+      });
+
+      const custodyList = (rawCustody || []).map((row, idx) => {
+        const item = Array.isArray(row)
+          ? {
+              id: idx + 1,
+              custNo: String(row[0] || "").trim(),
+              date: String(row[1] || "").trim(),
+              code: String(row[2] || "").trim(),
+              descAr: String(row[3] || "").trim(),
+              unit: String(row[4] || "عدد").trim(),
+              qty: Number(row[5]) || 1,
+              recipient: String(row[6] || "").trim(),
+              job: String(row[7] || "").trim(),
+              empCode: String(row[8] || "").trim(),
+              phone: formatEgyptianPhone(row[9]),
+              status: String(row[10] || "مستمرة").trim(),
+              returnDate: String(row[11] || "").trim(),
+              contractor: String(row[12] || "").trim(),
+              serial: String(row[13] || "").trim(),
+              notes: String(row[14] || "").trim()
+            }
+          : { ...row, id: row.id || idx + 1, phone: formatEgyptianPhone(row.phone) };
+
+        if (isNumericCodeLike(item.job)) {
+          if (!item.empCode) item.empCode = item.job;
+          item.job = "";
+        }
+
+        let matchedStaff = null;
+        if (item.empCode && staffMapByCode.has(item.empCode)) {
+          matchedStaff = staffMapByCode.get(item.empCode);
+        } else if (item.recipient && staffMapByName.has(normalizeArabic(item.recipient))) {
+          matchedStaff = staffMapByName.get(normalizeArabic(item.recipient));
+        }
+
+        if (matchedStaff) {
+          if (!item.empCode && matchedStaff.code) item.empCode = matchedStaff.code;
+          if (!item.job && matchedStaff.job) item.job = matchedStaff.job;
+          if (!item.phone && matchedStaff.phone) item.phone = formatEgyptianPhone(matchedStaff.phone);
+        }
+
+        item.status = item.status.includes("ارتجاع") ? "ارتجاع" : "مستمرة";
+        return item;
+      });
+
+      state.staff = staffList;
+      state.custody = custodyList;
+    }
+
+    // Initialize with embedded dataset immediately
+    hydrateData(INITIAL_DATA.s, INITIAL_DATA.c);
+
+    // =========================================================================
+    // 4. FIREBASE CLOUD SYNC (REAL-TIME BETWEEN LAPTOP & MOBILE)
+    // =========================================================================
+    let db = null;
+    let auth = null;
+    const appId = typeof __app_id !== "undefined" ? __app_id : "custody-zone-g-0056";
+
+    async function initFirebaseSync() {
+      try {
+        if (typeof __firebase_config === "undefined") {
+          updateSyncUI(false, "وضع العمل المحلي (البيانات المدمجة)");
+          return;
+        }
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+
+        // Rule 3: Authenticate BEFORE Firestore queries
+        if (typeof __initial_auth_token !== "undefined" && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+
+        state.user = auth.currentUser;
+        if (!state.user) return;
+
+        // Rule 1: Strict public path so Laptop & Mobile share the exact same live dataset
+        const masterDocRef = doc(db, "artifacts", appId, "public", "data", "custody_master", "latest");
+
+        onSnapshot(
+          masterDocRef,
+          (snapshot) => {
+            state.isCloudConnected = true;
+            if (snapshot.exists()) {
+              const data = snapshot.data();
+              if (data.custodyJson) {
+                const parsedCustody = JSON.parse(data.custodyJson);
+                const parsedStaff = data.staffJson ? JSON.parse(data.staffJson) : INITIAL_DATA.s;
+                const hadCorruptedJobs = parsedStaff.some(r => Array.isArray(r) && isNumericCodeLike(r[2])) ||
+                                         parsedCustody.some(r => Array.isArray(r) && isNumericCodeLike(r[7]));
+                hydrateData(parsedStaff, parsedCustody);
+                state.lastSyncTime = data.updatedAt || new Date().toLocaleString("ar-EG");
+                updateSyncUI(true, `متصل ومزامن • آخر تحديث: ${state.lastSyncTime}`);
+                refreshAllViews();
+                if (hadCorruptedJobs) {
+                  const cleanStaff = state.staff.map(st => [st.code, st.nameAr, st.job, st.phone, st.nationalId]);
+                  const cleanCust = state.custody.map(c => [c.custNo, c.date, c.code, c.descAr, c.unit, c.qty, c.recipient, c.job, c.empCode, c.phone, c.status, c.returnDate, c.contractor, c.serial, c.notes]);
+                  saveDatasetToCloud(cleanStaff, cleanCust, true);
+                }
+              }
+            } else {
+              // Seed initial data to cloud on first ever run
+              saveDatasetToCloud(INITIAL_DATA.s, INITIAL_DATA.c, true);
+            }
+          },
+          (error) => {
+            console.error("Firestore sync error:", error);
+            updateSyncUI(false, "تعذر الاتصال السحابي — يعمل بالبيانات المحلية");
+          }
+        );
+      } catch (err) {
+        console.error("Firebase init failed:", err);
+        updateSyncUI(false, "وضع العمل المحلي");
+      }
+    }
+
+    async function saveDatasetToCloud(staffArray, custodyArray, isSilent = false) {
+      if (!db || !state.user) {
+        if (!isSilent) showToast("تم تحديث البيانات محلياً بنجاح", "success");
+        return;
+      }
+
+      try {
+        updateSyncUI(true, "جاري رفع ومزامنة البيانات سحابياً...");
+        const masterDocRef = doc(db, "artifacts", appId, "public", "data", "custody_master", "latest");
+        const nowStr = new Date().toLocaleString("ar-EG", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit"
+        });
+
+        await setDoc(masterDocRef, {
+          staffJson: JSON.stringify(staffArray),
+          custodyJson: JSON.stringify(custodyArray),
+          updatedAt: nowStr,
+          totalRecords: custodyArray.length
+        });
+
+        if (!isSilent) {
+          showToast(`تم رفع ومزامنة ${custodyArray.length} سجل عهدة أونلاين بنجاح! سيظهر الآن على الموبايل فوراً.`, "success");
+        }
+      } catch (error) {
+        console.error("Error saving to Firestore:", error);
+        showToast("حدث خطأ أثناء المزامنة السحابية، تم الحفظ محلياً.", "error");
+      }
+    }
+
+    function updateSyncUI(connected, labelText) {
+      const dot = document.getElementById("syncDot");
+      const text = document.getElementById("syncText");
+      const sub = document.getElementById("lastUpdatedText");
+
+      if (connected) {
+        dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981]";
+        text.textContent = "مزامنة أونلاين نشطة";
+        sub.textContent = labelText;
+      } else {
+        dot.className = "w-2.5 h-2.5 rounded-full bg-amber-400";
+        text.textContent = "البيانات جاهزة";
+        sub.textContent = labelText;
+      }
+    }
+
+    // =========================================================================
+    // 5. EXCEL PARSING (SHEETJS) FOR "TOOLS عهده.xlsx"
+    // =========================================================================
+    function formatExcelDate(val) {
+      if (!val) return "";
+      if (val instanceof Date && !isNaN(val)) {
+        return val.toISOString().split("T")[0];
+      }
+      if (typeof val === "number" && val > 20000) {
+        const utcDays = Math.floor(val - 25569);
+        const date = new Date(utcDays * 86400 * 1000);
+        return date.toISOString().split("T")[0];
+      }
+      const str = String(val).trim();
+      // Handle DD/MM/YYYY or YYYY-MM-DD
+      const slashMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (slashMatch) {
+        const [, d, m, y] = slashMatch;
+        return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+      }
+      return str;
+    }
+
+    document.getElementById("excelUploadInput").addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      try {
+        showToast("جاري قراءة وتحليل ملف الإكسيل...", "info");
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+
+        // 1. Parse "العهدة" sheet
+        const custodySheetName = workbook.SheetNames.find(n => n.includes("العهد")) || workbook.SheetNames[0];
+        const custodySheet = workbook.Sheets[custodySheetName];
+        const rawRows = XLSX.utils.sheet_to_json(custodySheet, { header: 1, defval: "" });
+
+        // Find header row dynamically (contains "رقم العهدة" or "المستلم" or "توصيف عربي")
+        let headerRowIndex = rawRows.findIndex(r =>
+          r.some(cell => String(cell).includes("المستلم") || String(cell).includes("توصيف عربي"))
+        );
+        if (headerRowIndex === -1) headerRowIndex = 3; // Default row 4 (index 3)
+
+        const headers = rawRows[headerRowIndex].map(h => String(h).trim());
+        const findCol = (keywords) => headers.findIndex(h => keywords.some(k => h.includes(k)));
+
+        const colIdx = {
+          custNo: findCol(["رقم العهدة", "رقم العهده"]),
+          date: findCol(["تاريخ العهدة", "تاريخ العهده"]),
+          code: headers.findIndex(h => (h === "الكود" || h.includes("الكود")) && !h.includes("الوظيف")),
+          descAr: findCol(["توصيف عربي", "التوصيف"]),
+          unit: findCol(["الوحدة", "الوحده"]),
+          qty: findCol(["الكمية", "الكميه"]),
+          recipient: findCol(["المستلم"]),
+          job: headers.findIndex(h => (h.includes("الوظيفة") || h.includes("الوظيفه")) && !h.includes("كود")),
+          empCode: findCol(["الكود الوظيفي", "الكود الوظيفى"]),
+          phone: findCol(["الهاتف", "التليفون"]),
+          status: findCol(["حالة العهدة", "حاله العهده", "الحالة"]),
+          returnDate: findCol(["تاريخ الارتجاع"]),
+          contractor: findCol(["مقاول"]),
+          serial: findCol(["سريل", "سيريال"]),
+          notes: findCol(["ملاحظات"])
+        };
+
+        const parsedCustodyCompact = [];
+        for (let i = headerRowIndex + 1; i < rawRows.length; i++) {
+          const r = rawRows[i];
+          if (!r || r.length === 0) continue;
+
+          const descAr = colIdx.descAr >= 0 ? String(r[colIdx.descAr] || "").trim() : "";
+          const recipient = colIdx.recipient >= 0 ? String(r[colIdx.recipient] || "").trim() : "";
+          const custNo = colIdx.custNo >= 0 ? String(r[colIdx.custNo] || "").trim() : "";
+
+          // Ignore trailing empty formula rows
+          if (!descAr && !recipient && !custNo) continue;
+
+          parsedCustodyCompact.push([
+            custNo,
+            colIdx.date >= 0 ? formatExcelDate(r[colIdx.date]) : "",
+            colIdx.code >= 0 ? String(r[colIdx.code] || "").trim() : "",
+            descAr,
+            colIdx.unit >= 0 ? String(r[colIdx.unit] || "عدد").trim() : "عدد",
+            colIdx.qty >= 0 ? Number(r[colIdx.qty]) || 1 : 1,
+            recipient,
+            colIdx.job >= 0 ? String(r[colIdx.job] || "").trim() : "",
+            colIdx.empCode >= 0 ? String(r[colIdx.empCode] || "").trim() : "",
+            colIdx.phone >= 0 ? String(r[colIdx.phone] || "").trim() : "",
+            colIdx.status >= 0 ? String(r[colIdx.status] || "مستمرة").trim() : "مستمرة",
+            colIdx.returnDate >= 0 ? formatExcelDate(r[colIdx.returnDate]) : "",
+            colIdx.contractor >= 0 ? String(r[colIdx.contractor] || "").trim() : "",
+            colIdx.serial >= 0 ? String(r[colIdx.serial] || "").trim() : "",
+            colIdx.notes >= 0 ? String(r[colIdx.notes] || "").trim() : ""
+          ]);
+        }
+
+        // 2. Parse "قائمة الأسماء" sheet if present
+        let parsedStaffCompact = INITIAL_DATA.s;
+        const staffSheetName = workbook.SheetNames.find(n => n.includes("الأسماء") || n.includes("الاسماء"));
+        if (staffSheetName) {
+          const staffRows = XLSX.utils.sheet_to_json(workbook.Sheets[staffSheetName], { header: 1, defval: "" });
+          const sHeaderIdx = staffRows.findIndex(r => r.some(c => String(c).includes("الاسم") || String(c).includes("الكود")));
+          if (sHeaderIdx !== -1) {
+            const sHeaders = staffRows[sHeaderIdx].map(h => String(h).trim());
+            const sCodeIdx = sHeaders.findIndex(h => h.includes("الكود") || h.includes("كود"));
+            const sNatIdx = sHeaders.findIndex(h => h.includes("البطاق") || h.includes("قوم"));
+            const sNameIdx = sHeaders.findIndex(h => h === "الاسم" || h.includes("الاسم"));
+            const sJobIdx = sHeaders.findIndex(h => (h.includes("الوظيفة") || h.includes("الوظيفه") || h.includes("الوظيف")) && !h.includes("كود"));
+            const sPhoneIdx = sHeaders.findIndex(h => h.includes("التليفون") || h.includes("الهاتف"));
+
+            const tempStaff = [];
+            for (let i = sHeaderIdx + 1; i < staffRows.length; i++) {
+              const sr = staffRows[i];
+              const nameVal = sNameIdx >= 0 ? String(sr[sNameIdx] || "").trim() : "";
+              const codeVal = sCodeIdx >= 0 ? String(sr[sCodeIdx] || "").trim() : "";
+              if (!nameVal && !codeVal) continue;
+              tempStaff.push([
+                codeVal,
+                nameVal,
+                sJobIdx >= 0 ? String(sr[sJobIdx] || "").trim() : "",
+                sPhoneIdx >= 0 ? String(sr[sPhoneIdx] || "").trim() : "",
+                sNatIdx >= 0 ? String(sr[sNatIdx] || "").trim() : ""
+              ]);
+            }
+            if (tempStaff.length > 0) parsedStaffCompact = tempStaff;
+          }
+        }
+
+        if (parsedCustodyCompact.length === 0) {
+          showToast("لم يتم العثور على بيانات صالحة في شيت العهدة!", "error");
+          return;
+        }
+
+        hydrateData(parsedStaffCompact, parsedCustodyCompact);
+        state.selectedEntity = null;
+        state.searchQuery = "";
+        document.getElementById("smartSearchInput").value = "";
+        refreshAllViews();
+
+        await saveDatasetToCloud(parsedStaffCompact, parsedCustodyCompact, false);
+      } catch (err) {
+        console.error("Excel parse error:", err);
+        showToast("حدث خطأ أثناء قراءة ملف الإكسيل. تأكد من سلامة الملف.", "error");
+      } finally {
+        e.target.value = "";
+      }
+    });
+
+    // =========================================================================
+    // 6. SMART AUTOCOMPLETE ENGINE (PERSON / EMP_CODE / ARABIC ITEM)
+    // =========================================================================
+    function buildSearchIndexes() {
+      const peopleMap = new Map(); // normalizedName -> entity
+      const codeMap = new Map();   // empCode -> entity
+      const itemMap = new Map();   // normalizedDesc -> entity
+
+      // Seed from Staff list first so even staff with 0 custody appear in suggestions
+      state.staff.forEach(st => {
+        if (!st.nameAr) return;
+        const normName = normalizeArabic(st.nameAr);
+        if (!peopleMap.has(normName)) {
+          peopleMap.set(normName, {
+            type: "person",
+            normKey: normName,
+            label: st.nameAr,
+            empCode: st.code || "",
+            job: st.job || "",
+            phone: st.phone || "",
+            totalRows: 0,
+            activeRows: 0,
+            activeQty: 0
+          });
+        }
+        if (st.code) {
+          codeMap.set(st.code, {
+            type: "code",
+            normKey: st.code,
+            label: st.code,
+            personName: st.nameAr,
+            job: st.job || "",
+            phone: st.phone || "",
+            totalRows: 0,
+            activeRows: 0,
+            activeQty: 0
+          });
+        }
+      });
+
+      // Aggregate from Custody records
+      state.custody.forEach(row => {
+        const isActive = row.status === "مستمرة";
+        const qty = Number(row.qty) || 1;
+
+        // 1. Person index
+        if (row.recipient) {
+          const normName = normalizeArabic(row.recipient);
+          if (!peopleMap.has(normName)) {
+            peopleMap.set(normName, {
+              type: "person",
+              normKey: normName,
+              label: row.recipient,
+              empCode: row.empCode || "",
+              job: row.job || "",
+              phone: row.phone || "",
+              totalRows: 0,
+              activeRows: 0,
+              activeQty: 0
+            });
+          }
+          const p = peopleMap.get(normName);
+          if (!p.empCode && row.empCode) p.empCode = row.empCode;
+          if (!p.job && row.job) p.job = row.job;
+          if (!p.phone && row.phone) p.phone = row.phone;
+          p.totalRows += 1;
+          if (isActive) {
+            p.activeRows += 1;
+            p.activeQty += qty;
+          }
+        }
+
+        // 2. Employee Code index
+        if (row.empCode) {
+          const cKey = String(row.empCode).trim();
+          if (!codeMap.has(cKey)) {
+            codeMap.set(cKey, {
+              type: "code",
+              normKey: cKey,
+              label: cKey,
+              personName: row.recipient || "غير مسجل",
+              job: row.job || "",
+              phone: row.phone || "",
+              totalRows: 0,
+              activeRows: 0,
+              activeQty: 0
+            });
+          }
+          const c = codeMap.get(cKey);
+          if ((!c.personName || c.personName === "غير مسجل") && row.recipient) c.personName = row.recipient;
+          if (!c.job && row.job) c.job = row.job;
+          c.totalRows += 1;
+          if (isActive) {
+            c.activeRows += 1;
+            c.activeQty += qty;
+          }
+        }
+
+        // 3. Arabic Item Description index
+        if (row.descAr) {
+          const normItem = normalizeArabic(row.descAr);
+          if (!itemMap.has(normItem)) {
+            itemMap.set(normItem, {
+              type: "item",
+              normKey: normItem,
+              label: row.descAr,
+              sapCode: row.code || "",
+              totalRows: 0,
+              totalQty: 0,
+              activeRows: 0,
+              activeQty: 0
+            });
+          }
+          const it = itemMap.get(normItem);
+          if (!it.sapCode && row.code) it.sapCode = row.code;
+          it.totalRows += 1;
+          it.totalQty += qty;
+          if (isActive) {
+            it.activeRows += 1;
+            it.activeQty += qty;
+          }
+        }
+      });
+
+      return {
+        people: Array.from(peopleMap.values()),
+        codes: Array.from(codeMap.values()),
+        items: Array.from(itemMap.values())
+      };
+    }
+
+    function renderAutocompleteSuggestions() {
+      const dropdown = document.getElementById("autocompleteDropdown");
+      const rawQuery = state.searchQuery.trim();
+      const normQuery = normalizeArabic(rawQuery);
+
+      if (!normQuery) {
+        dropdown.classList.add("hidden");
+        dropdown.innerHTML = "";
+        return;
+      }
+
+      const { people, codes, items } = buildSearchIndexes();
+      const scope = state.searchScope;
+      const results = [];
+
+      // Match People
+      if (scope === "all" || scope === "person") {
+        const matchedPeople = people
+          .filter(p => p.normKey.includes(normQuery))
+          .sort((a, b) => {
+            // Prioritize startsWith & active custody count
+            const aStarts = a.normKey.startsWith(normQuery) ? 1 : 0;
+            const bStarts = b.normKey.startsWith(normQuery) ? 1 : 0;
+            if (bStarts !== aStarts) return bStarts - aStarts;
+            return b.activeRows - a.activeRows;
+          })
+          .slice(0, 7);
+        results.push(...matchedPeople);
+      }
+
+      // Match Employee Codes
+      if (scope === "all" || scope === "code") {
+        const matchedCodes = codes
+          .filter(c => normalizeArabic(c.label).includes(normQuery) || normalizeArabic(c.personName).includes(normQuery))
+          .filter(c => scope === "code" ? normalizeArabic(c.label).includes(normQuery) : normalizeArabic(c.label).includes(normQuery))
+          .sort((a, b) => b.activeRows - a.activeRows)
+          .slice(0, 6);
+        results.push(...matchedCodes);
+      }
+
+      // Match Arabic Item Descriptions
+      if (scope === "all" || scope === "item") {
+        const matchedItems = items
+          .filter(it => it.normKey.includes(normQuery) || normalizeArabic(it.sapCode).includes(normQuery))
+          .sort((a, b) => {
+            const aStarts = a.normKey.startsWith(normQuery) ? 1 : 0;
+            const bStarts = b.normKey.startsWith(normQuery) ? 1 : 0;
+            if (bStarts !== aStarts) return bStarts - aStarts;
+            return b.activeQty - a.activeQty;
+          })
+          .slice(0, 7);
+        results.push(...matchedItems);
+      }
+
+      if (results.length === 0) {
+        dropdown.innerHTML = `
+          <div class="p-4 text-center text-xs text-slate-400">
+            لا توجد اقتراحات مطابقة لـ "<strong class="text-white">${escapeHtml(rawQuery)}</strong>" — جرب كلمات أخرى أو غيّر نطاق البحث
+          </div>
+        `;
+        dropdown.classList.remove("hidden");
+        return;
+      }
+
+      dropdown.innerHTML = results
+        .map((item, idx) => {
+          if (item.type === "person") {
+            return `
+              <button type="button" data-idx="${idx}" class="suggestion-item w-full text-right px-4 py-3 hover:bg-emerald-500/10 transition-colors flex items-center justify-between gap-3 group">
+                <div class="flex items-center gap-3 min-w-0">
+                  <div class="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                    <i data-lucide="user" class="w-4 h-4"></i>
+                  </div>
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="font-bold text-sm text-white group-hover:text-emerald-300 truncate">${escapeHtml(item.label)}</span>
+                      <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 shrink-0">مستلم</span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5 truncate">
+                      ${item.empCode ? `<span class="font-mono text-slate-300">كود: ${escapeHtml(item.empCode)}</span>` : ""}
+                      ${item.job ? `<span>• ${escapeHtml(item.job)}</span>` : ""}
+                    </div>
+                  </div>
+                </div>
+                <div class="text-left shrink-0">
+                  <span class="inline-block px-2.5 py-1 rounded-lg text-xs font-bold ${item.activeRows > 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-800 text-slate-400"}">
+                    ${item.activeRows} مستمرة
+                  </span>
+                  <div class="text-[10px] text-slate-500 mt-0.5">إجمالي ${item.totalRows} سجل</div>
+                </div>
+              </button>
+            `;
+          } else if (item.type === "code") {
+            return `
+              <button type="button" data-idx="${idx}" class="suggestion-item w-full text-right px-4 py-3 hover:bg-amber-500/10 transition-colors flex items-center justify-between gap-3 group">
+                <div class="flex items-center gap-3 min-w-0">
+                  <div class="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                    <i data-lucide="hash" class="w-4 h-4"></i>
+                  </div>
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="font-mono font-bold text-sm text-amber-300 group-hover:text-amber-200">${escapeHtml(item.label)}</span>
+                      <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-400">كود وظيفي</span>
+                    </div>
+                    <div class="text-xs text-slate-300 mt-0.5 truncate">
+                      ${escapeHtml(item.personName)} ${item.job ? `<span class="text-slate-400">(${escapeHtml(item.job)})</span>` : ""}
+                    </div>
+                  </div>
+                </div>
+                <div class="text-left shrink-0">
+                  <span class="inline-block px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300">
+                    ${item.activeRows} مستمرة
+                  </span>
+                </div>
+              </button>
+            `;
+          } else {
+            return `
+              <button type="button" data-idx="${idx}" class="suggestion-item w-full text-right px-4 py-3 hover:bg-sky-500/10 transition-colors flex items-center justify-between gap-3 group">
+                <div class="flex items-center gap-3 min-w-0">
+                  <div class="w-9 h-9 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
+                    <i data-lucide="wrench" class="w-4 h-4"></i>
+                  </div>
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="font-bold text-sm text-white group-hover:text-sky-300 truncate">${escapeHtml(item.label)}</span>
+                      <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-500/15 text-sky-400 shrink-0">صنف</span>
+                    </div>
+                    ${item.sapCode ? `<div class="text-[11px] font-mono text-slate-400 mt-0.5 truncate">${escapeHtml(item.sapCode)}</div>` : ""}
+                  </div>
+                </div>
+                <div class="text-left shrink-0">
+                  <span class="inline-block px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-500/20 text-sky-300">
+                    مستمر: ${item.activeQty} وحدة
+                  </span>
+                  <div class="text-[10px] text-slate-500 mt-0.5">إجمالي المنصرف: ${item.totalQty}</div>
+                </div>
+              </button>
+            `;
+          }
+        })
+        .join("");
+
+      dropdown.classList.remove("hidden");
+      lucide.createIcons();
+
+      // Attach click handlers to suggestion buttons
+      dropdown.querySelectorAll(".suggestion-item").forEach((btn, idx) => {
+        btn.addEventListener("click", () => {
+          selectSuggestionEntity(results[idx]);
+          dropdown.classList.add("hidden");
+        });
+      });
+    }
+
+    function selectSuggestionEntity(entity) {
+      state.selectedEntity = entity;
+      state.visibleLimit = 100;
+      const input = document.getElementById("smartSearchInput");
+      input.value = entity.label;
+      state.searchQuery = entity.label;
+      document.getElementById("clearSearchBtn").classList.remove("hidden");
+
+      // Automatically default to 'مستمرة' when selecting a person or employee code
+      if (entity.type === "person" || entity.type === "code") {
+        state.statusFilter = "مستمرة";
+      } else {
+        state.statusFilter = "all";
+      }
+      updateStatusFilterUI();
+      refreshAllViews();
+    }
+
+    // =========================================================================
+    // 7. FILTERING & RENDERING TABLE, STATS, AND SELECTED ENTITY PROFILE
+    // =========================================================================
+    function getFilteredRecords() {
+      let list = state.custody;
+
+      // 1. Filter by Selected Entity (Exact/Normalized match for Person, Code, or Item)
+      if (state.selectedEntity) {
+        const ent = state.selectedEntity;
+        if (ent.type === "person") {
+          list = list.filter(r =>
+            normalizeArabic(r.recipient) === ent.normKey ||
+            (ent.empCode && r.empCode && String(r.empCode).trim() === String(ent.empCode).trim())
+          );
+        } else if (ent.type === "code") {
+          list = list.filter(r =>
+            String(r.empCode).trim() === ent.normKey ||
+            (ent.personName && normalizeArabic(r.recipient) === normalizeArabic(ent.personName))
+          );
+        } else if (ent.type === "item") {
+          list = list.filter(r => normalizeArabic(r.descAr) === ent.normKey);
+        }
+      } else if (state.searchQuery.trim()) {
+        // Live free-text filter if user typed without picking from dropdown
+        const q = normalizeArabic(state.searchQuery);
+        list = list.filter(r => {
+          if (state.searchScope === "person") return normalizeArabic(r.recipient).includes(q);
+          if (state.searchScope === "code") return normalizeArabic(r.empCode).includes(q);
+          if (state.searchScope === "item") return normalizeArabic(r.descAr).includes(q) || normalizeArabic(r.code).includes(q);
+          return (
+            normalizeArabic(r.recipient).includes(q) ||
+            normalizeArabic(r.empCode).includes(q) ||
+            normalizeArabic(r.descAr).includes(q) ||
+            normalizeArabic(r.custNo).includes(q) ||
+            normalizeArabic(r.contractor).includes(q) ||
+            normalizeArabic(r.serial).includes(q)
+          );
+        });
+      }
+
+      return list;
+    }
+
+    function renderSelectedEntityBanner(baseFilteredRecords) {
+      const card = document.getElementById("selectedEntityCard");
+      if (!state.selectedEntity) {
+        card.classList.add("hidden");
+        return;
+      }
+
+      const ent = state.selectedEntity;
+      card.classList.remove("hidden");
+
+      const avatar = document.getElementById("entityAvatar");
+      const typeBadge = document.getElementById("entityTypeBadge");
+      const codeBadge = document.getElementById("entityCodeBadge");
+      const title = document.getElementById("entityTitle");
+      const meta = document.getElementById("entityMeta");
+
+      if (ent.type === "person" || ent.type === "code") {
+        const displayName = ent.type === "person" ? ent.label : ent.personName;
+        const displayCode = ent.type === "code" ? ent.label : ent.empCode;
+
+        avatar.innerHTML = `<i data-lucide="user-check" class="w-7 h-7"></i>`;
+        typeBadge.textContent = "ملف عُهدة موظف / مستلم";
+        codeBadge.textContent = displayCode ? `الكود الوظيفي: ${displayCode}` : "بدون كود وظيفي";
+        title.textContent = displayName;
+
+        const contractors = [...new Set(baseFilteredRecords.map(r => r.contractor).filter(Boolean))];
+        meta.innerHTML = `
+          ${ent.job ? `<span><strong>الوظيفة:</strong> ${escapeHtml(ent.job)}</span>` : ""}
+          ${ent.phone ? `<span><strong>الهاتف:</strong> <span dir="ltr" class="font-mono">${escapeHtml(ent.phone)}</span></span>` : ""}
+          ${contractors.length ? `<span><strong>المقاول المرتبط:</strong> ${escapeHtml(contractors.join("، "))}</span>` : ""}
+        `;
+      } else {
+        avatar.innerHTML = `<i data-lucide="package" class="w-7 h-7"></i>`;
+        typeBadge.textContent = "تتبع صنف عُهدة";
+        codeBadge.textContent = ent.sapCode || "صنف مخزني";
+        title.textContent = ent.label;
+
+        const holdersCount = new Set(baseFilteredRecords.filter(r => r.status === "مستمرة").map(r => r.recipient)).size;
+        meta.innerHTML = `
+          <span><strong>عدد المستلمين الحاليين (عهدة مستمرة):</strong> ${holdersCount} مستلم</span>
+        `;
+      }
+    }
+
+    function renderKPIs(baseRecords) {
+      let totalQty = 0;
+      let activeRows = 0;
+      let activeQty = 0;
+      let returnedRows = 0;
+      let returnedQty = 0;
+      const peopleSet = new Set();
+      const itemsSet = new Set();
+
+      baseRecords.forEach(r => {
+        const q = Number(r.qty) || 1;
+        totalQty += q;
+        if (r.status === "مستمرة") {
+          activeRows++;
+          activeQty += q;
+        } else {
+          returnedRows++;
+          returnedQty += q;
+        }
+        if (r.recipient) peopleSet.add(normalizeArabic(r.recipient));
+        if (r.descAr) itemsSet.add(normalizeArabic(r.descAr));
+      });
+
+      document.getElementById("statTotalRows").textContent = baseRecords.length.toLocaleString("en-US");
+      document.getElementById("statTotalQty").textContent = totalQty.toLocaleString("en-US");
+      document.getElementById("statActiveRows").textContent = activeRows.toLocaleString("en-US");
+      document.getElementById("statActiveQty").textContent = activeQty.toLocaleString("en-US");
+      document.getElementById("statReturnedRows").textContent = returnedRows.toLocaleString("en-US");
+      document.getElementById("statReturnedQty").textContent = returnedQty.toLocaleString("en-US");
+      document.getElementById("statUniquePeople").textContent = peopleSet.size.toLocaleString("en-US");
+      document.getElementById("statUniqueItems").textContent = itemsSet.size.toLocaleString("en-US");
+    }
+
+    function renderTable(baseRecords) {
+      const tbody = document.getElementById("custodyTableBody");
+      const emptyState = document.getElementById("emptyState");
+      const badgeCount = document.getElementById("visibleBadgeCount");
+      const paginationInfo = document.getElementById("paginationInfo");
+      const loadMoreBtn = document.getElementById("loadMoreBtn");
+      const showAllRowsBtn = document.getElementById("showAllRowsBtn");
+
+      // Apply status filter (الكل / مستمرة / ارتجاع)
+      const records = state.statusFilter === "all"
+        ? baseRecords
+        : baseRecords.filter(r => r.status === state.statusFilter);
+
+      badgeCount.textContent = records.length;
+
+      if (records.length === 0) {
+        tbody.innerHTML = "";
+        emptyState.classList.remove("hidden");
+        paginationInfo.textContent = "عرض 0 من 0 سجل";
+        loadMoreBtn.classList.add("hidden");
+        showAllRowsBtn.classList.add("hidden");
+        return;
+      }
+
+      emptyState.classList.add("hidden");
+      const slice = records.slice(0, state.visibleLimit);
+
+      tbody.innerHTML = slice
+        .map((row, index) => {
+          const isActive = row.status === "مستمرة";
+          const durationText = calculateArabicDuration(row.date, isActive ? null : row.returnDate);
+
+          return `
+            <tr class="hover:bg-charcoal-850/90 transition-colors">
+              <td class="py-3 px-3 font-mono text-slate-500 text-xs">${index + 1}</td>
+              <td class="py-3 px-3 font-mono font-bold text-slate-200 whitespace-nowrap">${escapeHtml(row.custNo || "-")}</td>
+              <td class="py-3 px-3 font-mono text-slate-300 text-xs whitespace-nowrap">${escapeHtml(row.date || "-")}</td>
+              <td class="py-3 px-3 font-mono text-slate-400 text-xs whitespace-nowrap">${escapeHtml(row.code || "-")}</td>
+              <td class="py-3 px-3">
+                <button type="button" onclick="window.quickFilterItem('${escapeHtml(row.descAr).replace(/'/g, "\\'")}')" class="text-right font-bold text-white hover:text-emerald-400 transition-colors">
+                  ${escapeHtml(row.descAr)}
+                </button>
+              </td>
+              <td class="py-3 px-3 text-center text-xs text-slate-300 whitespace-nowrap">${escapeHtml(row.unit || "عدد")}</td>
+              <td class="py-3 px-3 text-center whitespace-nowrap">
+                <span class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-lg bg-charcoal-950 border border-slate-700 font-mono font-bold text-white text-xs">
+                  ${row.qty}
+                </span>
+              </td>
+              <td class="py-3 px-3">
+                <button type="button" onclick="window.quickFilterPerson('${escapeHtml(row.recipient).replace(/'/g, "\\'")}', '${escapeHtml(row.empCode).replace(/'/g, "\\'")}')" class="text-right font-bold text-emerald-300 hover:text-emerald-200 hover:underline transition-colors">
+                  ${escapeHtml(row.recipient || "-")}
+                </button>
+              </td>
+              <td class="py-3 px-3 text-xs text-slate-300 whitespace-nowrap">${escapeHtml(row.job || "-")}</td>
+              <td class="py-3 px-3 font-mono text-xs text-amber-300/90 whitespace-nowrap">
+                ${row.empCode ? `<button type="button" onclick="window.quickFilterCode('${escapeHtml(row.empCode).replace(/'/g, "\\'")}')" class="hover:underline">${escapeHtml(row.empCode)}</button>` : "-"}
+              </td>
+              <td class="py-3 px-3 font-mono text-xs text-slate-300 whitespace-nowrap" dir="ltr">${escapeHtml(row.phone || "-")}</td>
+              <td class="py-3 px-3 text-xs text-slate-300 whitespace-nowrap">${escapeHtml(durationText)}</td>
+              <td class="py-3 px-3 whitespace-nowrap">
+                ${
+                  isActive
+                    ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> مستمرة
+                       </span>`
+                    : `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                        <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span> ارتجاع
+                       </span>`
+                }
+              </td>
+              <td class="py-3 px-3 font-mono text-xs text-slate-400 whitespace-nowrap">
+                ${row.returnDate ? escapeHtml(row.returnDate) : (!isActive ? '<span class="text-amber-400">بدون تاريخ</span>' : "-")}
+              </td>
+              <td class="py-3 px-3 text-xs text-slate-200 whitespace-nowrap">${escapeHtml(row.contractor || "-")}</td>
+              <td class="py-3 px-3 font-mono text-xs text-amber-300/90 whitespace-nowrap">${escapeHtml(row.serial || "-")}</td>
+              <td class="py-3 px-3 text-xs text-slate-400">${escapeHtml(row.notes || "-")}</td>
+            </tr>
+          `;
+        })
+        .join("");
+
+      paginationInfo.textContent = `عرض ${slice.length} من إجمالي ${records.length} سجل`;
+
+      if (records.length > slice.length) {
+        loadMoreBtn.classList.remove("hidden");
+        showAllRowsBtn.classList.remove("hidden");
+      } else {
+        loadMoreBtn.classList.add("hidden");
+        showAllRowsBtn.classList.add("hidden");
+      }
+    }
+
+    function renderQuickChips() {
+      const container = document.getElementById("quickChipsContainer");
+      const { people, items } = buildSearchIndexes();
+
+      const topPeople = people
+        .filter(p => p.activeRows > 0)
+        .sort((a, b) => b.activeRows - a.activeRows)
+        .slice(0, 4);
+
+      const topItems = items
+        .filter(it => it.activeQty > 0)
+        .sort((a, b) => b.activeQty - a.activeQty)
+        .slice(0, 2);
+
+      const chipsHtml = [
+        ...topPeople.map(p => `
+          <button type="button" onclick="window.quickFilterPerson('${escapeHtml(p.label).replace(/'/g, "\\'")}', '${escapeHtml(p.empCode).replace(/'/g, "\\'")}')" class="px-2.5 py-1 rounded-xl bg-charcoal-950 hover:bg-emerald-500/15 text-slate-300 hover:text-emerald-300 border border-slate-800 hover:border-emerald-500/30 transition-all">
+            ${escapeHtml(p.label)} <span class="text-emerald-400 font-mono">(${p.activeRows})</span>
+          </button>
+        `),
+        ...topItems.map(it => `
+          <button type="button" onclick="window.quickFilterItem('${escapeHtml(it.label).replace(/'/g, "\\'")}')" class="px-2.5 py-1 rounded-xl bg-charcoal-950 hover:bg-sky-500/15 text-slate-300 hover:text-sky-300 border border-slate-800 hover:border-sky-500/30 transition-all">
+            ${escapeHtml(it.label)}
+          </button>
+        `)
+      ].join("");
+
+      container.innerHTML = chipsHtml;
+    }
+
+    function refreshAllViews() {
+      const baseRecords = getFilteredRecords();
+      renderSelectedEntityBanner(baseRecords);
+      renderKPIs(baseRecords);
+      renderTable(baseRecords);
+      renderQuickChips();
+      lucide.createIcons();
+    }
+
+    // =========================================================================
+    // 8. GLOBAL CLICK HELPERS & EVENT LISTENERS
+    // =========================================================================
+    window.quickFilterPerson = (name, empCode) => {
+      const { people } = buildSearchIndexes();
+      const found = people.find(p => p.normKey === normalizeArabic(name));
+      selectSuggestionEntity(
+        found || {
+          type: "person",
+          normKey: normalizeArabic(name),
+          label: name,
+          empCode: empCode || "",
+          job: "",
+          phone: ""
+        }
+      );
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    window.quickFilterCode = (code) => {
+      const { codes } = buildSearchIndexes();
+      const found = codes.find(c => c.normKey === String(code).trim());
+      if (found) {
+        selectSuggestionEntity(found);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    };
+
+    window.quickFilterItem = (descAr) => {
+      const { items } = buildSearchIndexes();
+      const found = items.find(i => i.normKey === normalizeArabic(descAr));
+      selectSuggestionEntity(
+        found || {
+          type: "item",
+          normKey: normalizeArabic(descAr),
+          label: descAr,
+          sapCode: ""
+        }
+      );
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    // Search Input Typing
+    const searchInput = document.getElementById("smartSearchInput");
+    const clearSearchBtn = document.getElementById("clearSearchBtn");
+
+    searchInput.addEventListener("input", (e) => {
+      state.searchQuery = e.target.value;
+      state.selectedEntity = null;
+      state.visibleLimit = 60;
+
+      if (state.searchQuery.trim().length > 0) {
+        clearSearchBtn.classList.remove("hidden");
+      } else {
+        clearSearchBtn.classList.add("hidden");
+      }
+
+      renderAutocompleteSuggestions();
+      refreshAllViews();
+    });
+
+    searchInput.addEventListener("focus", () => {
+      if (state.searchQuery.trim().length > 0 && !state.selectedEntity) {
+        renderAutocompleteSuggestions();
+      }
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener("click", (e) => {
+      const wrapper = document.getElementById("searchWrapper");
+      if (!wrapper.contains(e.target)) {
+        document.getElementById("autocompleteDropdown").classList.add("hidden");
+      }
+    });
+
+    // Clear Search Button
+    clearSearchBtn.addEventListener("click", () => {
+      searchInput.value = "";
+      state.searchQuery = "";
+      state.selectedEntity = null;
+      state.statusFilter = "all";
+      state.visibleLimit = 60;
+      clearSearchBtn.classList.add("hidden");
+      document.getElementById("autocompleteDropdown").classList.add("hidden");
+      updateStatusFilterUI();
+      refreshAllViews();
+      searchInput.focus();
+    });
+
+    // Reset Entity Selection Button
+    document.getElementById("resetSelectionBtn").addEventListener("click", () => {
+      searchInput.value = "";
+      state.searchQuery = "";
+      state.selectedEntity = null;
+      state.statusFilter = "all";
+      clearSearchBtn.classList.add("hidden");
+      updateStatusFilterUI();
+      refreshAllViews();
+    });
+
+    // Search Scope Tabs
+    document.querySelectorAll(".scope-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".scope-btn").forEach(b => {
+          b.classList.remove("active", "bg-emerald-600", "text-white", "shadow");
+          b.classList.add("text-slate-400");
+        });
+        btn.classList.add("active", "bg-emerald-600", "text-white", "shadow");
+        btn.classList.remove("text-slate-400");
+
+        state.searchScope = btn.dataset.scope;
+        if (state.searchQuery.trim()) {
+          renderAutocompleteSuggestions();
+          refreshAllViews();
+        }
+        searchInput.focus();
+      });
+    });
+
+    // Status Filter Buttons
+    function updateStatusFilterUI() {
+      document.querySelectorAll(".status-filter-btn").forEach(b => {
+        if (b.dataset.status === state.statusFilter) {
+          b.classList.add("active", "bg-slate-800", "text-white");
+          b.classList.remove("text-slate-400");
+        } else {
+          b.classList.remove("active", "bg-slate-800", "text-white");
+          b.classList.add("text-slate-400");
+        }
+      });
+    }
+
+    document.querySelectorAll(".status-filter-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        state.statusFilter = btn.dataset.status;
+        updateStatusFilterUI();
+        refreshAllViews();
+      });
+    });
+
+    // Pagination buttons
+    document.getElementById("loadMoreBtn").addEventListener("click", () => {
+      state.visibleLimit += 50;
+      refreshAllViews();
+    });
+
+    document.getElementById("showAllRowsBtn").addEventListener("click", () => {
+      state.visibleLimit = 5000;
+      refreshAllViews();
+    });
+
+    // Print Report Button
+    document.getElementById("printReportBtn").addEventListener("click", () => {
+      triggerUnifiedPrint();
+    });
+
+    // =========================================================================
+    // 8.5 FULL A4 LANDSCAPE PDF BUILDER, PREVIEW MODAL, PRINT & WHATSAPP SHARE
+    // =========================================================================
+    function buildFullLandscapePdfPayload() {
+      const baseRecords = getFilteredRecords();
+      const records = state.statusFilter === "all"
+        ? baseRecords
+        : baseRecords.filter(r => r.status === state.statusFilter);
+
+      if (records.length === 0) {
+        return null;
+      }
+
+      const statusLabel =
+        state.statusFilter === "مستمرة"
+          ? "العُهد المستمرة فقط"
+          : state.statusFilter === "ارتجاع"
+          ? "العُهد المرتجعة فقط"
+          : "جميع العُهد (مستمرة ومرتجعة)";
+
+      const todayDate = new Date().toISOString().slice(0, 10);
+      const todayStr = `${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, "0")}/${String(new Date().getDate()).padStart(2, "0")}`;
+
+      let subjectTitle = "كشف عُهد المخزن العام";
+      let subjectSubHtml = "";
+      let entityNameForFile = "كشف عهد المخزن العام";
+      let isPersonSelected = false;
+
+      if (state.selectedEntity) {
+        const ent = state.selectedEntity;
+        if (ent.type === "person" || ent.type === "code") {
+          isPersonSelected = true;
+          const displayName = ent.type === "person" ? ent.label : ent.personName;
+          const displayCode = ent.type === "code" ? ent.label : ent.empCode;
+          subjectTitle = displayName;
+          entityNameForFile = displayName;
+
+          const detailsParts = [];
+          if (displayCode) {
+            detailsParts.push(`
+              <div style="display: inline-flex; align-items: center; gap: 6px;">
+                <span style="font-weight: 700; color: #0f172a;">الكود الوظيفي:</span>
+                <span dir="ltr" style="font-family: 'Inter', Arial, sans-serif; font-weight: 700; color: #1e293b;">${escapeHtml(displayCode)}</span>
+              </div>
+            `);
+          }
+          if (ent.job) {
+            detailsParts.push(`
+              <div style="display: inline-flex; align-items: center; gap: 6px;">
+                <span style="font-weight: 700; color: #0f172a;">الوظيفة:</span>
+                <span style="font-weight: 600; color: #1e293b;">${escapeHtml(ent.job)}</span>
+              </div>
+            `);
+          }
+          if (ent.phone) {
+            detailsParts.push(`
+              <div style="display: inline-flex; align-items: center; gap: 6px;">
+                <span style="font-weight: 700; color: #0f172a;">رقم الهاتف:</span>
+                <span dir="ltr" style="font-family: 'Inter', Arial, sans-serif; font-weight: 700; color: #1e293b;">${escapeHtml(formatEgyptianPhone(ent.phone))}</span>
+              </div>
+            `);
+          }
+
+          if (detailsParts.length > 0) {
+            subjectSubHtml = `<div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 36px; font-size: 13px;">${detailsParts.join("")}</div>`;
+          }
+        } else {
+          subjectTitle = `تتبع صنف: ${ent.label}`;
+          entityNameForFile = ent.label;
+          if (ent.sapCode) {
+            subjectSubHtml = `
+              <div style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px;">
+                <span style="font-weight: 700; color: #0f172a;">كود الصنف:</span>
+                <span dir="ltr" style="font-family: 'Inter', Arial, sans-serif; font-weight: 700;">${escapeHtml(ent.sapCode)}</span>
+              </div>
+            `;
+          }
+        }
+      } else if (state.searchQuery.trim()) {
+        subjectTitle = `نتائج البحث: ${state.searchQuery.trim()}`;
+        entityNameForFile = state.searchQuery.trim();
+      }
+
+      const safeEntityName = entityNameForFile
+        .replace(/[\\/:*?"<>|]/g, "-")
+        .replace(/\s+/g, " ")
+        .trim();
+      const baseDocTitle = `عهدة - ${safeEntityName} - ${todayDate}`;
+      const fileName = `${baseDocTitle}.pdf`;
+
+      const colGroupHtml = isPersonSelected
+        ? `
+          <col style="width: 3%;" />
+          <col style="width: 6%;" />
+          <col style="width: 8.5%;" />
+          <col style="width: 14%;" />
+          <col style="width: 24.5%;" />
+          <col style="width: 4.5%;" />
+          <col style="width: 4.5%;" />
+          <col style="width: 9.5%;" />
+          <col style="width: 6%;" />
+          <col style="width: 7%;" />
+          <col style="width: 6.5%;" />
+          <col style="width: 6%;" />
+        `
+        : `
+          <col style="width: 2.5%;" />
+          <col style="width: 5%;" />
+          <col style="width: 6.5%;" />
+          <col style="width: 10%;" />
+          <col style="width: 16%;" />
+          <col style="width: 4%;" />
+          <col style="width: 4%;" />
+          <col style="width: 11.5%;" />
+          <col style="width: 7%;" />
+          <col style="width: 6%;" />
+          <col style="width: 6.5%;" />
+          <col style="width: 7%;" />
+          <col style="width: 4.5%;" />
+          <col style="width: 3.5%;" />
+          <col style="width: 3%;" />
+          <col style="width: 3%;" />
+        `;
+
+      const recipientHeadersHtml = isPersonSelected
+        ? ""
+        : `
+          <th style="border: 1px solid #334155; padding: 6px 4px; text-align: right;">المستلم</th>
+          <th style="border: 1px solid #334155; padding: 6px 3px; text-align: center;">الوظيفة</th>
+          <th style="border: 1px solid #334155; padding: 6px 3px; text-align: center;">الكود الوظيفي</th>
+          <th style="border: 1px solid #334155; padding: 6px 3px; text-align: center;">الهاتف</th>
+        `;
+
+      const tableFontSize = isPersonSelected ? "10.5px" : "8.5px";
+
+      const rowHtmlArray = records.map((row, index) => {
+        const isActive = row.status === "مستمرة";
+        const durationText = calculateArabicDuration(row.date, isActive ? null : row.returnDate);
+        const rowBg = index % 2 === 0 ? "#ffffff" : "#f8fafc";
+
+        const recipientCellsHtml = isPersonSelected
+          ? ""
+          : `
+            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; font-weight: 700; word-wrap: break-word;">${escapeHtml(row.recipient || "-")}</td>
+            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; word-wrap: break-word;">${escapeHtml(row.job || "-")}</td>
+            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-family: 'Inter', Arial, sans-serif;">${escapeHtml(row.empCode || "-")}</td>
+            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-family: 'Inter', Arial, sans-serif;" dir="ltr">${escapeHtml(row.phone || "-")}</td>
+          `;
+
+        return `
+          <tr style="background: ${rowBg};">
+            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-family: 'Inter', Arial, sans-serif; font-weight: 600;">${index + 1}</td>
+            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-family: 'Inter', Arial, sans-serif; font-weight: 700;">${escapeHtml(row.custNo || "-")}</td>
+            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-family: 'Inter', Arial, sans-serif; white-space: nowrap;">${escapeHtml(row.date || "-")}</td>
+            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-family: 'Inter', Arial, sans-serif; font-size: 7.5px; word-break: break-all;">${escapeHtml(row.code || "-")}</td>
+            <td style="border: 1px solid #cbd5e1; padding: 5px 6px; text-align: right; font-weight: 700; word-wrap: break-word;">${escapeHtml(row.descAr || "-")}</td>
+            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center;">${escapeHtml(row.unit || "عدد")}</td>
+            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-family: 'Inter', Arial, sans-serif; font-weight: 700;">${row.qty}</td>
+            ${recipientCellsHtml}
+            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; word-wrap: break-word;">${escapeHtml(durationText)}</td>
+            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-weight: 700; color: ${isActive ? "#047857" : "#0369a1"};">${isActive ? "مستمرة" : "ارتجاع"}</td>
+            <td style="border: 1px solid #cbd5e1; padding: 5px 4px; text-align: right; word-wrap: break-word;">${escapeHtml(row.contractor || "-")}</td>
+            <td style="border: 1px solid #cbd5e1; padding: 5px 3px; text-align: center; font-family: 'Inter', Arial, sans-serif; font-size: 9px; word-break: break-all;">${escapeHtml(row.serial || "-")}</td>
+            <td style="border: 1px solid #cbd5e1; padding: 5px 5px; text-align: right; word-wrap: break-word;">${escapeHtml(row.notes || "-")}</td>
+          </tr>
+        `;
+      });
+
+      const tableHeadHtml = `
+        <thead>
+          <tr style="background: #0f172a; color: #ffffff;">
+            <th style="border: 1px solid #334155; padding: 6px 3px; text-align: center;">م</th>
+            <th style="border: 1px solid #334155; padding: 6px 3px; text-align: center;">رقم العهدة</th>
+            <th style="border: 1px solid #334155; padding: 6px 3px; text-align: center;">تاريخ العهدة</th>
+            <th style="border: 1px solid #334155; padding: 6px 3px; text-align: center;">الكود</th>
+            <th style="border: 1px solid #334155; padding: 6px 6px; text-align: right;">توصيف عربي</th>
+            <th style="border: 1px solid #334155; padding: 6px 3px; text-align: center;">الوحدة</th>
+            <th style="border: 1px solid #334155; padding: 6px 3px; text-align: center;">الكمية</th>
+            ${recipientHeadersHtml}
+            <th style="border: 1px solid #334155; padding: 6px 3px; text-align: center;">المدة</th>
+            <th style="border: 1px solid #334155; padding: 6px 3px; text-align: center;">حالة العهدة</th>
+            <th style="border: 1px solid #334155; padding: 6px 4px; text-align: right;">مقاول</th>
+            <th style="border: 1px solid #334155; padding: 6px 3px; text-align: center;">سريل</th>
+            <th style="border: 1px solid #334155; padding: 6px 5px; text-align: right;">ملاحظات</th>
+          </tr>
+        </thead>
+      `;
+
+      // قياس الارتفاع الفعلي لكل صف لضمان عدم قطع أي صف بين صفحات الـ A4
+      const measureHost = document.createElement("div");
+      measureHost.style.cssText = "position: fixed; top: -9999px; left: 0; width: 1066px; visibility: hidden; pointer-events: none;";
+      measureHost.innerHTML = `
+        <table dir="rtl" style="width: 100%; table-layout: fixed; border-collapse: collapse; font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif; font-size: ${tableFontSize}; line-height: 1.4;">
+          <colgroup>${colGroupHtml}</colgroup>
+          <tbody>${rowHtmlArray.join("")}</tbody>
+        </table>
+      `;
+      document.body.appendChild(measureHost);
+      const measuredTrs = Array.from(measureHost.querySelectorAll("tbody tr"));
+      const rowHeights = measuredTrs.map(tr => Math.max(26, tr.getBoundingClientRect().height));
+      measureHost.remove();
+
+      // تقسيم الصفوف إلى صفحات A4 بالعرض (1122x793) دون أي تجاوز
+      const pagesRows = [];
+      let currentPageRows = [];
+      let currentHeight = 0;
+      const firstPageMaxBodyHeight = 455;
+      const nextPageMaxBodyHeight = 545;
+
+      rowHtmlArray.forEach((rowHtml, idx) => {
+        const h = rowHeights[idx] || 28;
+        const limit = pagesRows.length === 0 ? firstPageMaxBodyHeight : nextPageMaxBodyHeight;
+        if (currentPageRows.length > 0 && currentHeight + h > limit) {
+          pagesRows.push(currentPageRows);
+          currentPageRows = [rowHtml];
+          currentHeight = h;
+        } else {
+          currentPageRows.push(rowHtml);
+          currentHeight += h;
+        }
+      });
+      if (currentPageRows.length > 0) {
+        pagesRows.push(currentPageRows);
+      }
+
+      const totalPages = pagesRows.length;
+
+      const pagesHtmlArray = pagesRows.map((pRows, pageIdx) => {
+        const isFirst = pageIdx === 0;
+
+        const headerHtml = `
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 12px; gap: 12px;">
+            <div style="flex: 1.5; text-align: right; white-space: nowrap;">
+              <div style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; color: #0f172a; white-space: nowrap;">
+                <span>مشروع :</span>
+                <span>مستقبل مصر 400 ألف فدان - زون جي</span>
+              </div>
+            </div>
+            <div style="flex: 0 0 auto; text-align: center;">
+              <div style="display: inline-flex; align-items: center; justify-content: center; background: #047857; color: #ffffff; padding: 5px 28px; border-radius: 8px; font-size: 16px; font-weight: 800; white-space: nowrap;">
+                كشف عهدة
+              </div>
+            </div>
+            <div style="flex: 1; text-align: left; white-space: nowrap;">
+              <div style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #334155; white-space: nowrap;">
+                <span>تاريخ الطباعة :</span>
+                <span dir="ltr" style="font-family: 'Inter', Arial, sans-serif; font-weight: 700; color: #0f172a;">${todayStr}</span>
+              </div>
+            </div>
+          </div>
+        `;
+
+        const summaryBannerHtml = isFirst
+          ? `
+            <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 18px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 16px;">
+              <div style="flex: 1; text-align: center;">
+                <div style="font-size: 21px; font-weight: 800; color: #047857; line-height: 1.3;">${escapeHtml(subjectTitle)}</div>
+                ${subjectSubHtml ? `<div style="margin-top: 6px; display: flex; justify-content: center;">${subjectSubHtml}</div>` : ""}
+              </div>
+              <div style="background: #ffffff; border: 1.5px solid #059669; border-radius: 8px; padding: 6px 20px; text-align: center; flex-shrink: 0;">
+                <div style="color: #065f46; font-size: 11px; font-weight: 700;">عدد البنود</div>
+                <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 800; font-size: 19px; color: #047857; margin-top: 1px;">${records.length}</div>
+              </div>
+            </div>
+          `
+          : "";
+
+        const footerHtml = `
+          <div style="margin-top: auto; padding-top: 8px; border-top: 1.5px solid #cbd5e1; display: flex; justify-content: space-between; align-items: flex-end;">
+            <div style="display: flex; flex-direction: column; align-items: center; white-space: nowrap;">
+              <div style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; color: #0f172a; white-space: nowrap;">
+                <span style="color: #065f46; white-space: nowrap;">أمين المخزن :</span>
+                <span style="white-space: nowrap;">محمد صلاح محمود</span>
+              </div>
+              <div style="margin-top: 2px; display: flex; justify-content: center;">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 75" width="140" height="48" style="display: block; overflow: visible;">
+                  <g fill="none" stroke="#1d2d6b" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+                    <!-- Top-right loop -->
+                    <path d="M 162 24 C 169 23, 174 18, 172 12 C 170 8, 165 9, 165 14 C 165 18, 171 19, 173 16" />
+                    <!-- Top-right horizontal bar (level) -->
+                    <path d="M 155 26 L 182 26" />
+                    <!-- Rightmost vertical stroke -->
+                    <path d="M 176 26 C 176 34, 176 42, 176 49" />
+                    <!-- Two short vertical strokes -->
+                    <path d="M 169 35 C 169 40, 170 44, 171 48" />
+                    <path d="M 161 36 C 161 42, 163 47, 165 51" />
+                    <!-- Main loop and level horizontal stroke to the left -->
+                    <path d="M 152 52 C 149 47, 146 39, 144 33 C 143 30, 149 30, 153 34 C 156 38, 155 44, 149 46 L 42 46" />
+                    <!-- Left upward tick -->
+                    <path d="M 71 34 C 71 39, 72 44, 72 46" />
+                  </g>
+                  <!-- Dot under left tick -->
+                  <circle cx="72" cy="56" r="1.9" fill="#1d2d6b" />
+                </svg>
+              </div>
+            </div>
+            ${
+              totalPages > 1
+                ? `<div style="font-size: 11px; font-weight: 700; color: #64748b; padding-bottom: 4px; white-space: nowrap;">صفحة ${pageIdx + 1} من ${totalPages}</div>`
+                : ""
+            }
+          </div>
+        `;
+
+        return `
+          <div class="pdf-a4-page" dir="rtl" style="font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif; background: #ffffff; color: #0f172a; padding: 20px 28px; width: 1122px; height: 793px; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; page-break-after: ${pageIdx < totalPages - 1 ? "always" : "auto"};">
+            ${headerHtml}
+            ${summaryBannerHtml}
+            <table style="width: 100%; table-layout: fixed; border-collapse: collapse; font-size: ${tableFontSize}; line-height: 1.4;">
+              <colgroup>${colGroupHtml}</colgroup>
+              ${tableHeadHtml}
+              <tbody>${pRows.join("")}</tbody>
+            </table>
+            ${footerHtml}
+          </div>
+        `;
+      });
+
+      return {
+        records,
+        statusLabel,
+        subjectTitle,
+        baseDocTitle,
+        fileName,
+        pagesHtmlArray,
+        documentHtml: pagesHtmlArray.join("")
+      };
+    }
+
+    function triggerUnifiedPrint() {
+      const payload = buildFullLandscapePdfPayload();
+      if (!payload) {
+        showToast("لا توجد بيانات للطباعة!", "error");
+        return;
+      }
+
+      const printContainer = document.getElementById("printSheetContainer");
+      const originalTitle = document.title;
+
+      // حقن نفس صفحات المعاينة تماماً في حاوية الطباعة وتغيير عنوان الصفحة ليحفظ باسم الشخص عند الطباعة إلى PDF
+      printContainer.innerHTML = payload.documentHtml;
+      document.title = payload.baseDocTitle;
+
+      window.print();
+
+      setTimeout(() => {
+        document.title = originalTitle;
+        printContainer.innerHTML = "";
+      }, 500);
+    }
+    window.triggerUnifiedPrint = triggerUnifiedPrint;
+
+    async function renderExactPreviewCanvas(payload) {
+      // إنشاء حاوية خلفية غير مرئية للمستخدم (opacity: 1 على الصفحات نفسها لالتقاط سليم 100% بمحرك المتصفح الأصلي)
+      const captureHost = document.createElement("div");
+      captureHost.style.cssText = [
+        "position: fixed",
+        "top: 0",
+        "left: 0",
+        "width: 1122px",
+        "z-index: -9999",
+        "pointer-events: none",
+        "background: #ffffff"
+      ].join(";");
+      captureHost.innerHTML = payload.documentHtml;
+      document.body.appendChild(captureHost);
+
+      if (document.fonts && document.fonts.ready) {
+        await document.fonts.ready;
+      }
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      try {
+        const { jsPDF } = window.jspdf;
+        const pdfDoc = new jsPDF({
+          orientation: "landscape",
+          unit: "mm",
+          format: "a4",
+          compress: true
+        });
+
+        const pageElements = Array.from(captureHost.querySelectorAll(".pdf-a4-page"));
+        for (let i = 0; i < pageElements.length; i++) {
+          const pageEl = pageElements[i];
+          const renderOpts = {
+            width: 1122,
+            height: 793,
+            pixelRatio: 2.2,
+            backgroundColor: "#ffffff",
+            quality: 0.96,
+            cacheBust: false
+          };
+
+          let imgDataUrl;
+          try {
+            imgDataUrl = await window.htmlToImage.toJpeg(pageEl, renderOpts);
+          } catch (fontErr) {
+            // في حال منع CORS تحميل الخط الخارجي، نستخدم خط النظام العربي الأصلي بنفس الدقة والترابط
+            imgDataUrl = await window.htmlToImage.toJpeg(pageEl, { ...renderOpts, skipFonts: true });
+          }
+
+          if (i > 0) {
+            pdfDoc.addPage("a4", "landscape");
+          }
+          pdfDoc.addImage(imgDataUrl, "JPEG", 0, 0, 297, 210, undefined, "FAST");
+        }
+
+        pdfDoc.setProperties({
+          title: payload.baseDocTitle,
+          subject: "كشف عهدة - مشروع مستقبل مصر 400 ألف فدان - زون جي"
+        });
+        return pdfDoc;
+      } finally {
+        captureHost.remove();
+      }
+    }
+
+    function openPdfPreviewModal() {
+      const payload = buildFullLandscapePdfPayload();
+      if (!payload) {
+        showToast("لا توجد بيانات للمعاينة!", "error");
+        return;
+      }
+
+      const paper = document.getElementById("pdfPreviewPaper");
+      paper.innerHTML = payload.pagesHtmlArray
+        .map(html => `<div class="shadow-2xl rounded-sm overflow-hidden bg-white">${html}</div>`)
+        .join("");
+      document.getElementById("pdfPreviewModal").classList.remove("hidden");
+      lucide.createIcons();
+    }
+
+    async function downloadFullLandscapePdf() {
+      const payload = buildFullLandscapePdfPayload();
+      if (!payload) {
+        showToast("لا توجد بيانات لتحميلها!", "error");
+        return;
+      }
+
+      try {
+        showToast("جاري إنشاء ملف PDF بالعرض (A4 Landscape)...", "info");
+        const pdfDoc = await renderExactPreviewCanvas(payload);
+        pdfDoc.save(payload.fileName);
+        showToast(`تم تحميل كشف العهدة (${payload.fileName}) بنجاح!`, "success");
+      } catch (err) {
+        console.error("PDF download error:", err);
+        showToast("حدث خطأ أثناء إنشاء ملف الـ PDF.", "error");
+      }
+    }
+
+    async function sharePdfViaWhatsApp() {
+      const payload = buildFullLandscapePdfPayload();
+      if (!payload) {
+        showToast("لا توجد بيانات لمشاركتها!", "error");
+        return;
+      }
+
+      // رابط واتساب ويب المباشر الذي يفتح قائمة الأسماء لاختيار جهة الاتصال للمشاركة
+      const waWebUrl = `https://web.whatsapp.com/send?text=${encodeURIComponent(payload.baseDocTitle)}`;
+
+      // فتح تبويب واتساب ويب بشكل متزامن فور ضغطة المستخدم لتجنب حظر المتصفح للنوافذ المنبثقة
+      let waTab = null;
+      try {
+        waTab = window.open("", "_blank");
+        if (waTab && waTab.document) {
+          waTab.document.write(`
+            <!DOCTYPE html>
+            <html lang="ar" dir="rtl">
+            <head>
+              <meta charset="UTF-8" />
+              <title>جاري فتح واتساب ويب...</title>
+              <style>
+                body { font-family: Tahoma, Arial, sans-serif; background: #0b141a; color: #e9edef; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+                .box { background: #111b21; border: 1px solid #25D366; border-radius: 16px; padding: 28px 36px; max-width: 420px; }
+                h2 { color: #25D366; margin: 0 0 10px; font-size: 20px; }
+                p { margin: 0; font-size: 14px; color: #aebac1; line-height: 1.6; }
+              </style>
+            </head>
+            <body>
+              <div class="box">
+                <h2>جاري تجهيز ملف العهدة...</h2>
+                <p>يتم الآن تحميل ملف الـ PDF باسم الشخص وتحويلك تلقائياً إلى قائمة أسماء واتساب ويب لاختيار جهة الاتصال.</p>
+              </div>
+            </body>
+            </html>
+          `);
+          waTab.document.close();
+        }
+      } catch (e) {
+        waTab = null;
+      }
+
+      try {
+        showToast("جاري تجهيز ملف الـ PDF وفتح قائمة أسماء واتساب ويب...", "info");
+        const pdfDoc = await renderExactPreviewCanvas(payload);
+        const arrayBuffer = pdfDoc.output("arraybuffer");
+        const pdfBlob = new Blob([arrayBuffer], { type: "application/pdf" });
+
+        // 1. تحميل ملف الـ PDF مباشرة باسم: عهدة - اسم الشخص - تاريخ اليوم.pdf
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        const downloadLink = document.createElement("a");
+        downloadLink.href = blobUrl;
+        downloadLink.download = payload.fileName;
+        downloadLink.style.display = "none";
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        downloadLink.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+
+        // 2. توجيه التبويب المفتوح إلى قائمة أسماء واتساب ويب لاختيار المستلم
+        if (waTab && !waTab.closed) {
+          waTab.location.href = waWebUrl;
+          waTab.focus();
+        } else {
+          const waAnchor = document.createElement("a");
+          waAnchor.href = waWebUrl;
+          waAnchor.target = "_blank";
+          waAnchor.rel = "noopener noreferrer";
+          waAnchor.style.display = "none";
+          document.body.appendChild(waAnchor);
+          waAnchor.click();
+          waAnchor.remove();
+        }
+
+        showActionToast(
+          `تم تحميل (${payload.fileName}) وفتح قائمة أسماء واتساب ويب — اختر الاسم ثم اسحب الملف أو أرفقه (+):`,
+          "فتح قائمة أسماء واتساب ويب",
+          waWebUrl
+        );
+      } catch (err) {
+        if (waTab && !waTab.closed) waTab.close();
+        console.error("WhatsApp Web PDF share error:", err);
+        showToast("تعذر توليد الملف، جرب زر معاينة PDF ثم تحميل PDF.", "error");
+      }
+    }
+
+    function showActionToast(message, actionLabel, url) {
+      const container = document.getElementById("toastContainer");
+      const toast = document.createElement("div");
+      toast.className = "pointer-events-auto border border-[#25D366]/60 bg-charcoal-850 text-emerald-100 px-4 py-3.5 rounded-2xl shadow-2xl text-xs font-bold flex flex-col gap-2.5 transition-all";
+      toast.innerHTML = `
+        <span>${escapeHtml(message)}</span>
+        <div class="flex items-center justify-end gap-2">
+          <a href="${url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white font-extrabold text-xs shadow">
+            <span>${escapeHtml(actionLabel)}</span>
+          </a>
+        </div>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 350);
+      }, 9000);
+    }
+
+    // Bind PDF, Print & WhatsApp Buttons
+    document.getElementById("whatsappPdfBannerBtn").addEventListener("click", sharePdfViaWhatsApp);
+    document.getElementById("whatsappPdfTableBtn").addEventListener("click", sharePdfViaWhatsApp);
+    document.getElementById("previewPdfBannerBtn").addEventListener("click", openPdfPreviewModal);
+    document.getElementById("previewPdfTableBtn").addEventListener("click", openPdfPreviewModal);
+
+    // Modal Internal Action Buttons
+    document.getElementById("closePdfPreviewBtn").addEventListener("click", () => {
+      document.getElementById("pdfPreviewModal").classList.add("hidden");
+    });
+    document.getElementById("pdfPreviewModal").addEventListener("click", (e) => {
+      if (e.target.id === "pdfPreviewModal") {
+        document.getElementById("pdfPreviewModal").classList.add("hidden");
+      }
+    });
+    document.getElementById("modalSendWhatsappBtn").addEventListener("click", sharePdfViaWhatsApp);
+    document.getElementById("modalDownloadPdfBtn").addEventListener("click", downloadFullLandscapePdf);
+    document.getElementById("modalPrintPdfBtn").addEventListener("click", () => {
+      document.getElementById("pdfPreviewModal").classList.add("hidden");
+      triggerUnifiedPrint();
+    });
+
+    // Toast Helper
+    function showToast(message, type = "info") {
+      const container = document.getElementById("toastContainer");
+      const toast = document.createElement("div");
+
+      const colors = {
+        success: "bg-charcoal-850 border-emerald-500/50 text-emerald-200",
+        error: "bg-charcoal-850 border-rose-500/50 text-rose-200",
+        info: "bg-charcoal-850 border-sky-500/50 text-sky-200"
+      };
+
+      toast.className = `pointer-events-auto border ${colors[type] || colors.info} px-4 py-3 rounded-2xl shadow-2xl text-xs font-bold flex items-center justify-between gap-3 transition-all`;
+      toast.innerHTML = `<span>${escapeHtml(message)}</span>`;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 300);
+      }, 4500);
+    }
+
+    // =========================================================================
+    // 9. BOOTSTRAP APPLICATION
+    // =========================================================================
+    refreshAllViews();
+    initFirebaseSync();
+  </script>
+</body>
+</html>
